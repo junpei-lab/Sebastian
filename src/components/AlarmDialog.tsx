@@ -8,12 +8,13 @@ type AlarmDialogProps = {
 
 const AlarmDialog = ({ alarm, onStop, onOpenUrl }: AlarmDialogProps) => {
   if (!alarm) return null;
+  const dialogTitle = alarm.title.trim() ? alarm.title : "タイトル未設定";
 
   return (
     <div className="alarm-dialog-backdrop">
       <div className="alarm-dialog card">
         <p className="dialog-label">アラームが鳴っています！</p>
-        <h2 className="dialog-title">{alarm.title}</h2>
+        <h2 className="dialog-title">{dialogTitle}</h2>
         <p className="dialog-time">{alarm.timeLabel}</p>
         <div className="dialog-actions">
           {alarm.url && (

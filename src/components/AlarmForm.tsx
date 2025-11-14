@@ -28,11 +28,10 @@ const AlarmForm = ({ onSubmit }: AlarmFormProps) => {
   const [error, setError] = useState<string | null>(null);
 
   const disableSubmit = useMemo(() => {
-    if (!title.trim()) return true;
     if (!timeLabel) return true;
     if (repeatEnabled && repeatDays.length === 0) return true;
     return submitting;
-  }, [repeatEnabled, repeatDays.length, submitting, timeLabel, title]);
+  }, [repeatEnabled, repeatDays.length, submitting, timeLabel]);
 
   const toggleDay = (day: Weekday) => {
     setRepeatDays((prev) =>
@@ -77,11 +76,11 @@ const AlarmForm = ({ onSubmit }: AlarmFormProps) => {
     <form className="card" onSubmit={handleSubmit}>
       <h2>新規アラーム追加</h2>
       <label className="form-row">
-        <span>タイトル</span>
+        <span>タイトル（任意）</span>
         <input
           type="text"
           value={title}
-          placeholder="例：朝会"
+          placeholder="例：朝会（空欄でも可）"
           onChange={(e) => setTitle(e.target.value)}
         />
       </label>

@@ -100,9 +100,6 @@ impl AlarmStore {
             repeat_days,
         } = payload;
         let title = title.trim().to_string();
-        if title.is_empty() {
-            return Err(anyhow!("タイトルは空にできません。"));
-        }
         if repeat_enabled && repeat_days.is_empty() {
             return Err(anyhow!(
                 "繰り返しが ON の場合は曜日を 1 つ以上指定してください。"
@@ -130,11 +127,8 @@ impl AlarmStore {
     }
 
     pub fn update_title(&mut self, id: &str, title: &str) -> Result<()> {
-        if title.trim().is_empty() {
-            return Err(anyhow!("タイトルは空にできません。"));
-        }
         if let Some(alarm) = self.alarms.iter_mut().find(|a| a.id == id) {
-            alarm.title = title.to_string();
+            alarm.title = title.trim().to_string();
             self.save()?;
             Ok(())
         } else {

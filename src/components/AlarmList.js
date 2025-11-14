@@ -20,14 +20,17 @@ const AlarmList = ({ alarms, onDelete, onTitleChange, onOpenUrl }) => {
     const sorted = useMemo(() => [...alarms].sort((a, b) => a.nextFireTime.localeCompare(b.nextFireTime)), [alarms]);
     const handleBlur = async (alarm) => {
         const draft = editing[alarm.id];
-        if (draft === undefined || draft === alarm.title)
+        if (draft === undefined)
             return;
-        await onTitleChange(alarm.id, draft);
+        const normalized = draft.trim();
+        if (normalized === alarm.title)
+            return;
+        await onTitleChange(alarm.id, normalized);
     };
     if (sorted.length === 0) {
         return _jsx("p", { className: "empty", children: "\u30A2\u30E9\u30FC\u30E0\u306F\u307E\u3060\u3042\u308A\u307E\u305B\u3093\u3002" });
     }
-    return (_jsx("div", { className: "alarm-list", children: sorted.map((alarm) => (_jsxs("article", { className: "card alarm-card", children: [_jsxs("div", { className: "alarm-header", children: [_jsx("input", { className: "title-input", value: editing[alarm.id] ?? alarm.title, onChange: (e) => setEditing((prev) => ({
+    return (_jsx("div", { className: "alarm-list", children: sorted.map((alarm) => (_jsxs("article", { className: "card alarm-card", children: [_jsxs("div", { className: "alarm-header", children: [_jsx("input", { className: "title-input", value: editing[alarm.id] ?? alarm.title, placeholder: "\u30BF\u30A4\u30C8\u30EB\u672A\u8A2D\u5B9A", onChange: (e) => setEditing((prev) => ({
                                 ...prev,
                                 [alarm.id]: e.target.value
                             })), onBlur: () => handleBlur(alarm) }), _jsx("span", { className: "time-label", children: alarm.timeLabel })] }), _jsxs("p", { className: "next-fire", children: ["\u6B21\u56DE: ", dayjs(alarm.nextFireTime).format("YYYY/MM/DD HH:mm")] }), _jsx("div", { className: "tag-row", children: alarm.repeatEnabled ? (_jsxs("span", { className: "tag tag-green", children: ["\u7E70\u308A\u8FD4\u3057: ", weekdayLabel(alarm.repeatDays)] })) : (_jsx("span", { className: "tag tag-blue", children: "\u5358\u767A" })) }), _jsxs("div", { className: "alarm-actions", children: [alarm.url && (_jsx("button", { type: "button", onClick: () => {

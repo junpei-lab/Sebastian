@@ -70,8 +70,6 @@ const App = () => {
     };
     const handleTitleChange = async (id, title) => {
         const trimmed = title.trim();
-        if (!trimmed)
-            return;
         const updated = await invoke("update_alarm_title", { id, title: trimmed });
         setAlarms(updated);
     };

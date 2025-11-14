@@ -32,8 +32,10 @@ const AlarmList = ({ alarms, onDelete, onTitleChange, onOpenUrl }: AlarmListProp
 
   const handleBlur = async (alarm: Alarm) => {
     const draft = editing[alarm.id];
-    if (draft === undefined || draft === alarm.title) return;
-    await onTitleChange(alarm.id, draft);
+    if (draft === undefined) return;
+    const normalized = draft.trim();
+    if (normalized === alarm.title) return;
+    await onTitleChange(alarm.id, normalized);
   };
 
   if (sorted.length === 0) {
@@ -48,6 +50,7 @@ const AlarmList = ({ alarms, onDelete, onTitleChange, onOpenUrl }: AlarmListProp
             <input
               className="title-input"
               value={editing[alarm.id] ?? alarm.title}
+              placeholder="タイトル未設定"
               onChange={(e) =>
                 setEditing((prev) => ({
                   ...prev,
