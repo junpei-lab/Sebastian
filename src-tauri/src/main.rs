@@ -1,3 +1,5 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod alarm_store;
 
 use alarm_store::{Alarm, AlarmStore, NewAlarmPayload};
