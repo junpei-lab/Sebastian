@@ -4,22 +4,31 @@
 
 @layer base {
   :root {
-    font-family: "Cormorant Garamond", "Noto Sans JP", system-ui, -apple-system,
-      BlinkMacSystemFont, serif;
-    color: #f7f3ea;
-    background-color: #050506;
-  }
-
-  body {
-    @apply m-0 text-[#f7f3ea];
-    background: repeating-linear-gradient(
+    --sebastian-bg: #050506;
+    --sebastian-pattern: repeating-linear-gradient(
         -45deg,
         rgba(255, 255, 255, 0.02) 0,
         rgba(255, 255, 255, 0.02) 8px,
         transparent 8px,
         transparent 16px
       ),
-      #050506;
+      var(--sebastian-bg);
+    font-family: "Cormorant Garamond", "Noto Sans JP", system-ui, -apple-system,
+      BlinkMacSystemFont, serif;
+    color: #f7f3ea;
+    background: var(--sebastian-pattern);
+  }
+
+  html,
+  body,
+  #root {
+    min-height: 100vh;
+  }
+
+  body {
+    @apply m-0 text-[#f7f3ea];
+    background: var(--sebastian-pattern);
+    background-attachment: fixed;
   }
 
   button,
