@@ -72,6 +72,36 @@ fn clamp_lead_minutes(value: i64) -> i64 {
     value.max(0).min(MAX_LEAD_MINUTES)
 }
 
+fn build_alarm_from_payload(payload: NewAlarmPayload, now: DateTime<Local>) -> Result<Alarm> {
+    let NewAlarmPayload {
+        title,
+        time_label,
+        url,
+        repeat_enabled,
+        repeat_days,
+        lead_minutes,
+    } = payload;
+    if repeat_enabled && repeat_days.is_empty() {
+        return Err(anyhow!(
+            "繰り返しが ON の場合は曜日を 1 つ以上指定してください。"
+        ));
+    }
+    let title = title.trim().to_string();
+    let time_label = time_label.trim().to_string();
+    let lead_minutes = clamp_lead_minutes(lead_minutes);
+    let next = compute_next_fire(&time_label, repeat_enabled, &repeat_days, lead_minutes, now)?;
+    Ok(Alarm {
+        id: Uuid::new_v4().to_string(),
+        title,
+        time_label,
+        next_fire_time: next.to_rfc3339(),
+        url,
+        repeat_enabled,
+        repeat_days,
+        lead_minutes,
+    })
+}
+
 #[derive(Debug)]
 pub struct AlarmStore {
     path: PathBuf,
@@ -105,34 +135,7 @@ impl AlarmStore {
     }
 
     pub fn create(&mut self, payload: NewAlarmPayload) -> Result<()> {
-        let now = Local::now();
-        let NewAlarmPayload {
-            title,
-            time_label,
-            url,
-            repeat_enabled,
-            repeat_days,
-            lead_minutes,
-        } = payload;
-        let title = title.trim().to_string();
-        if repeat_enabled && repeat_days.is_empty() {
-            return Err(anyhow!(
-                "繰り返しが ON の場合は曜日を 1 つ以上指定してください。"
-            ));
-        }
-        let time_label = time_label.trim().to_string();
-        let lead_minutes = clamp_lead_minutes(lead_minutes);
-        let next = compute_next_fire(&time_label, repeat_enabled, &repeat_days, lead_minutes, now)?;
-        let alarm = Alarm {
-            id: Uuid::new_v4().to_string(),
-            title,
-            time_label,
-            next_fire_time: next.to_rfc3339(),
-            url,
-            repeat_enabled,
-            repeat_days,
-            lead_minutes,
-        };
+        let alarm = build_alarm_from_payload(payload, Local::now())?;
         self.alarms.push(alarm);
         self.save()
     }
@@ -230,6 +233,22 @@ impl AlarmStore {
             self.save()?;
         }
         Ok(())
+    }
+
+    pub fn import_many(
+        &mut self,
+        payloads: Vec<NewAlarmPayload>,
+        replace_existing: bool,
+    ) -> Result<()> {
+        if replace_existing {
+            self.alarms.clear();
+            self.ringing.clear();
+        }
+        for payload in payloads {
+            let alarm = build_alarm_from_payload(payload, Local::now())?;
+            self.alarms.push(alarm);
+        }
+        self.save()
     }
 
     fn save(&self) -> Result<()> {

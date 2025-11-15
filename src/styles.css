@@ -55,6 +55,10 @@
     @apply text-[#c9c9c9] mt-1 text-sm;
   }
 
+  .toolbar {
+    @apply flex justify-end gap-2 mb-5 flex-wrap;
+  }
+
   .add-button {
     @apply inline-flex items-center gap-1.5 text-sm uppercase tracking-[0.08em] rounded-full border border-transparent bg-[#f7f3ea] text-[#111218] px-4 py-2 shadow transition-shadow;
   }
@@ -71,6 +75,14 @@
     @apply fixed left-1/2 -translate-x-1/2 bottom-6 z-20 px-8 py-3 shadow-2xl;
   }
 
+  .import-button {
+    @apply text-[0.72rem] tracking-[0.2em] border border-white/30 bg-transparent text-[#f7f3ea] px-4 py-2 rounded-full transition-colors;
+  }
+
+  .import-button:hover {
+    @apply border-white/70;
+  }
+
   .card {
     @apply rounded-[12px] border border-white/10 shadow-[0_12px_30px_rgba(0,0,0,0.35)] p-4 bg-gradient-to-br from-[#0b0d12] to-[#111319];
   }
@@ -81,6 +93,18 @@
 
   .form-row span {
     @apply text-[#d1d1d1];
+  }
+
+  .import-card {
+    @apply space-y-3;
+  }
+
+  .import-hint {
+    @apply text-xs text-[#b8b8b8] tracking-wide;
+  }
+
+  .import-hint code {
+    @apply text-[#f7f3ea] bg-white/10 px-1 rounded;
   }
 
   input[type="text"],
@@ -317,5 +341,21 @@
 
   .icon-button:hover {
     @apply border-white;
+  }
+
+  .json-textarea {
+    @apply w-full min-h-[220px] rounded-2xl border border-white/15 bg-black/70 px-3 py-2 text-sm leading-relaxed text-[#f7f3ea] resize-y;
+  }
+
+  .json-textarea:focus-visible {
+    @apply outline-none ring-2 ring-[#c8a96c99];
+  }
+
+  .import-checkbox {
+    @apply flex items-center gap-2 text-xs text-[#d1d1d1];
+  }
+
+  .import-checkbox input {
+    @apply w-4 h-4 accent-[#c8a96c];
   }
 }

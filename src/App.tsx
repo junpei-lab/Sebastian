@@ -6,6 +6,7 @@ import { Alarm, NewAlarmPayload } from "./types/alarm";
 import AlarmList from "./components/AlarmList";
 import AlarmDialog from "./components/AlarmDialog";
 import AddAlarmModal from "./components/AddAlarmModal";
+import ImportAlarmsModal from "./components/ImportAlarmsModal";
 
 const App = () => {
   const [alarms, setAlarms] = useState<Alarm[]>([]);
@@ -15,6 +16,7 @@ const App = () => {
   const [error, setError] = useState<string | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const oscillatorsRef = useRef<OscillatorNode[]>([]);
 
@@ -156,6 +158,17 @@ const App = () => {
     setAlarms(updated);
   };
 
+  const handleImportSubmit = async (
+    payloads: NewAlarmPayload[],
+    replaceExisting: boolean,
+  ) => {
+    const updated = await invoke<Alarm[]>("import_alarms", {
+      payloads,
+      replace_existing: replaceExisting,
+    });
+    setAlarms(updated);
+  };
+
   const handleStop = async () => {
     if (!activeAlarm) return;
     try {
@@ -177,6 +190,15 @@ const App = () => {
         <h1>Sebastian</h1>
         <p className="subtitle">Midnight feathers chase quiet echoes.</p>
       </header>
+      <div className="toolbar">
+        <button
+          type="button"
+          className="import-button"
+          onClick={() => setIsImportOpen(true)}
+        >
+          JSON からインポート
+        </button>
+      </div>
       {error && <p className="error-text">{error}</p>}
       {loading ? (
         <p>読み込み中...</p>
@@ -217,6 +239,11 @@ const App = () => {
         heading="アラーム編集"
         submitLabel="保存する"
         submittingLabel="保存中..."
+      />
+      <ImportAlarmsModal
+        open={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onSubmit={handleImportSubmit}
       />
     </main>
   );

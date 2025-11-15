@@ -6,6 +6,7 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import AlarmList from "./components/AlarmList";
 import AlarmDialog from "./components/AlarmDialog";
 import AddAlarmModal from "./components/AddAlarmModal";
+import ImportAlarmsModal from "./components/ImportAlarmsModal";
 const App = () => {
     const [alarms, setAlarms] = useState([]);
     const [activeAlarm, setActiveAlarm] = useState(null);
@@ -14,6 +15,7 @@ const App = () => {
     const [error, setError] = useState(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
+    const [isImportOpen, setIsImportOpen] = useState(false);
     const audioCtxRef = useRef(null);
     const oscillatorsRef = useRef([]);
     const refresh = useCallback(async () => {
@@ -144,6 +146,13 @@ const App = () => {
         });
         setAlarms(updated);
     };
+    const handleImportSubmit = async (payloads, replaceExisting) => {
+        const updated = await invoke("import_alarms", {
+            payloads,
+            replace_existing: replaceExisting,
+        });
+        setAlarms(updated);
+    };
     const handleStop = async () => {
         if (!activeAlarm)
             return;
@@ -161,9 +170,9 @@ const App = () => {
             stopTone();
         }
     };
-    return (_jsxs("main", { className: "container", children: [_jsxs("header", { children: [_jsx("h1", { children: "Sebastian" }), _jsx("p", { className: "subtitle", children: "Midnight feathers chase quiet echoes." })] }), error && _jsx("p", { className: "error-text", children: error }), loading ? (_jsx("p", { children: "\u8AAD\u307F\u8FBC\u307F\u4E2D..." })) : (_jsx(AlarmList, { alarms: alarms, onDelete: handleDelete, onOpenUrl: handleOpenUrl, onSelect: handleSelectAlarm })), _jsx("button", { type: "button", className: "add-button floating-add", onClick: () => setIsFormOpen(true), "aria-label": "\u30A2\u30E9\u30FC\u30E0\u3092\u8FFD\u52A0", children: "\uFF0B \u30A2\u30E9\u30FC\u30E0\u8FFD\u52A0" }), _jsx(AlarmDialog, { alarm: activeAlarm, onStop: handleStop, onOpenUrl: handleOpenUrl }), _jsx(AddAlarmModal, { open: isFormOpen, onClose: () => setIsFormOpen(false), onSubmit: handleCreate }), _jsx(AddAlarmModal, { open: isEditOpen && !!editingAlarm, onClose: () => {
+    return (_jsxs("main", { className: "container", children: [_jsxs("header", { children: [_jsx("h1", { children: "Sebastian" }), _jsx("p", { className: "subtitle", children: "Midnight feathers chase quiet echoes." })] }), _jsx("div", { className: "toolbar", children: _jsx("button", { type: "button", className: "import-button", onClick: () => setIsImportOpen(true), children: "JSON \u304B\u3089\u30A4\u30F3\u30DD\u30FC\u30C8" }) }), error && _jsx("p", { className: "error-text", children: error }), loading ? (_jsx("p", { children: "\u8AAD\u307F\u8FBC\u307F\u4E2D..." })) : (_jsx(AlarmList, { alarms: alarms, onDelete: handleDelete, onOpenUrl: handleOpenUrl, onSelect: handleSelectAlarm })), _jsx("button", { type: "button", className: "add-button floating-add", onClick: () => setIsFormOpen(true), "aria-label": "\u30A2\u30E9\u30FC\u30E0\u3092\u8FFD\u52A0", children: "\uFF0B \u30A2\u30E9\u30FC\u30E0\u8FFD\u52A0" }), _jsx(AlarmDialog, { alarm: activeAlarm, onStop: handleStop, onOpenUrl: handleOpenUrl }), _jsx(AddAlarmModal, { open: isFormOpen, onClose: () => setIsFormOpen(false), onSubmit: handleCreate }), _jsx(AddAlarmModal, { open: isEditOpen && !!editingAlarm, onClose: () => {
                     setIsEditOpen(false);
                     setEditingAlarm(null);
-                }, onSubmit: handleUpdate, initialValues: editingInitialValues, heading: "\u30A2\u30E9\u30FC\u30E0\u7DE8\u96C6", submitLabel: "\u4FDD\u5B58\u3059\u308B", submittingLabel: "\u4FDD\u5B58\u4E2D..." })] }));
+                }, onSubmit: handleUpdate, initialValues: editingInitialValues, heading: "\u30A2\u30E9\u30FC\u30E0\u7DE8\u96C6", submitLabel: "\u4FDD\u5B58\u3059\u308B", submittingLabel: "\u4FDD\u5B58\u4E2D..." }), _jsx(ImportAlarmsModal, { open: isImportOpen, onClose: () => setIsImportOpen(false), onSubmit: handleImportSubmit })] }));
 };
 export default App;

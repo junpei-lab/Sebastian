@@ -36,7 +36,8 @@ fn main() {
             delete_alarm,
             update_alarm_title,
             update_alarm,
-            acknowledge_alarm
+            acknowledge_alarm,
+            import_alarms
         ])
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
@@ -142,6 +143,22 @@ fn acknowledge_alarm(
         let _ = window.set_always_on_top(false);
     }
     Ok(updated)
+}
+
+#[tauri::command]
+fn import_alarms(
+    payloads: Vec<NewAlarmPayload>,
+    replace_existing: bool,
+    state: State<AppState>,
+) -> Result<Vec<Alarm>, String> {
+    if payloads.is_empty() {
+        return Err("インポート対象が空です。".into());
+    }
+    let mut guard = state.store.lock();
+    guard
+        .import_many(payloads, replace_existing)
+        .map_err(|e| e.to_string())?;
+    Ok(guard.list())
 }
 
 fn register_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
