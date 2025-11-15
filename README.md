@@ -1,5 +1,8 @@
 # 🦀 Sebastian
 
+![](./assets/screenshot.png)
+![](./assets/screenshot2.png)
+
 Sebastian は React + TypeScript + Vite で構築した UI と、Tauri + Rust 製の常駐スケジューラを組み合わせたマルチプラットフォーム向けデスクトップアラームです。アプリを閉じてもシステムトレイに常駐し、アラーム時刻になるとウィンドウを最前面に表示して金属質なベル音で通知します。  
 _Midnight feathers chase quiet echoes._
 
