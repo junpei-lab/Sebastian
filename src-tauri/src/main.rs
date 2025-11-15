@@ -35,6 +35,7 @@ fn main() {
             create_alarm,
             delete_alarm,
             update_alarm_title,
+            update_alarm,
             acknowledge_alarm
         ])
         .on_window_event(|window, event| {
@@ -112,6 +113,17 @@ fn update_alarm_title(
 ) -> Result<Vec<Alarm>, String> {
     let mut guard = state.store.lock();
     guard.update_title(&id, &title).map_err(|e| e.to_string())?;
+    Ok(guard.list())
+}
+
+#[tauri::command]
+fn update_alarm(
+    id: String,
+    payload: NewAlarmPayload,
+    state: State<AppState>,
+) -> Result<Vec<Alarm>, String> {
+    let mut guard = state.store.lock();
+    guard.update(&id, payload).map_err(|e| e.to_string())?;
     Ok(guard.list())
 }
 

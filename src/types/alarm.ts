@@ -8,6 +8,7 @@ export interface Alarm {
   url?: string;
   repeatEnabled: boolean;
   repeatDays: Weekday[];
+  leadMinutes: number;
 }
 
 export interface NewAlarmPayload {
@@ -16,4 +17,5 @@ export interface NewAlarmPayload {
   url?: string;
   repeatEnabled: boolean;
   repeatDays: Weekday[];
+  leadMinutes: number;
 }

@@ -19,6 +19,8 @@ pub struct Alarm {
     pub repeat_enabled: bool,
     #[serde(default)]
     pub repeat_days: Vec<Weekday>,
+    #[serde(default = "default_lead_minutes")]
+    pub lead_minutes: i64,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -30,6 +32,8 @@ pub struct NewAlarmPayload {
     pub repeat_enabled: bool,
     #[serde(default)]
     pub repeat_days: Vec<Weekday>,
+    #[serde(default = "default_lead_minutes")]
+    pub lead_minutes: i64,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -56,6 +60,16 @@ impl Weekday {
             Weekday::Sun => ChronoWeekday::Sun,
         }
     }
+}
+
+const MAX_LEAD_MINUTES: i64 = 720;
+
+fn default_lead_minutes() -> i64 {
+    3
+}
+
+fn clamp_lead_minutes(value: i64) -> i64 {
+    value.max(0).min(MAX_LEAD_MINUTES)
 }
 
 #[derive(Debug)]
@@ -98,6 +112,7 @@ impl AlarmStore {
             url,
             repeat_enabled,
             repeat_days,
+            lead_minutes,
         } = payload;
         let title = title.trim().to_string();
         if repeat_enabled && repeat_days.is_empty() {
@@ -106,7 +121,8 @@ impl AlarmStore {
             ));
         }
         let time_label = time_label.trim().to_string();
-        let next = compute_next_fire(&time_label, repeat_enabled, &repeat_days, now)?;
+        let lead_minutes = clamp_lead_minutes(lead_minutes);
+        let next = compute_next_fire(&time_label, repeat_enabled, &repeat_days, lead_minutes, now)?;
         let alarm = Alarm {
             id: Uuid::new_v4().to_string(),
             title,
@@ -115,6 +131,7 @@ impl AlarmStore {
             url,
             repeat_enabled,
             repeat_days,
+            lead_minutes,
         };
         self.alarms.push(alarm);
         self.save()
@@ -131,6 +148,39 @@ impl AlarmStore {
             alarm.title = title.trim().to_string();
             self.save()?;
             Ok(())
+        } else {
+            Err(anyhow!("指定されたアラームが見つかりません。"))
+        }
+    }
+
+    pub fn update(&mut self, id: &str, payload: NewAlarmPayload) -> Result<()> {
+        let now = Local::now();
+        let NewAlarmPayload {
+            title,
+            time_label,
+            url,
+            repeat_enabled,
+            repeat_days,
+            lead_minutes,
+        } = payload;
+        if repeat_enabled && repeat_days.is_empty() {
+            return Err(anyhow!(
+                "繰り返しが ON の場合は曜日を 1 つ以上指定してください。"
+            ));
+        }
+        let title = title.trim().to_string();
+        let time_label = time_label.trim().to_string();
+        let lead_minutes = clamp_lead_minutes(lead_minutes);
+        let next = compute_next_fire(&time_label, repeat_enabled, &repeat_days, lead_minutes, now)?;
+        if let Some(alarm) = self.alarms.iter_mut().find(|a| a.id == id) {
+            alarm.title = title;
+            alarm.time_label = time_label;
+            alarm.url = url;
+            alarm.repeat_enabled = repeat_enabled;
+            alarm.repeat_days = repeat_days;
+            alarm.next_fire_time = next.to_rfc3339();
+            alarm.lead_minutes = lead_minutes;
+            self.save()
         } else {
             Err(anyhow!("指定されたアラームが見つかりません。"))
         }
@@ -160,10 +210,12 @@ impl AlarmStore {
             let is_repeat =
                 self.alarms[index].repeat_enabled && !self.alarms[index].repeat_days.is_empty();
             if is_repeat {
+                let lead_minutes = self.alarms[index].lead_minutes;
                 let next = compute_next_fire(
                     &self.alarms[index].time_label,
                     true,
                     &self.alarms[index].repeat_days,
+                    lead_minutes,
                     Local::now(),
                 )?;
                 self.alarms[index].next_fire_time = next.to_rfc3339();
@@ -194,12 +246,16 @@ fn compute_next_fire(
     time_label: &str,
     repeat_enabled: bool,
     repeat_days: &[Weekday],
+    lead_minutes: i64,
     base: DateTime<Local>,
 ) -> Result<DateTime<Local>> {
     let time = parse_time_label(time_label)?;
+    let safe_lead = clamp_lead_minutes(lead_minutes);
+    let lead_duration = Duration::minutes(safe_lead);
+    let adjusted_base = base + lead_duration;
     if repeat_enabled && !repeat_days.is_empty() {
         for offset in 0..14 {
-            let candidate_date = base.date_naive() + Duration::days(offset);
+            let candidate_date = adjusted_base.date_naive() + Duration::days(offset);
             let weekday = candidate_date.weekday();
             if repeat_days.iter().any(|day| day.to_chrono() == weekday) {
                 if let Some(candidate) = Local
@@ -213,8 +269,8 @@ fn compute_next_fire(
                     )
                     .single()
                 {
-                    if candidate > base {
-                        return Ok(candidate);
+                    if candidate > adjusted_base {
+                        return Ok(candidate - lead_duration);
                     }
                 }
             }
@@ -224,19 +280,19 @@ fn compute_next_fire(
 
     let mut candidate = Local
         .with_ymd_and_hms(
-            base.year(),
-            base.month(),
-            base.day(),
+            adjusted_base.year(),
+            adjusted_base.month(),
+            adjusted_base.day(),
             time.hour(),
             time.minute(),
             0,
         )
         .single()
         .ok_or_else(|| anyhow!("無効な日付です。"))?;
-    if candidate <= base {
+    if candidate <= adjusted_base {
         candidate += Duration::days(1);
     }
-    Ok(candidate)
+    Ok(candidate - lead_duration)
 }
 
 fn parse_time_label(label: &str) -> Result<NaiveTime> {

@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { NewAlarmPayload, Weekday } from "../types/alarm";
+import TimePicker from "./TimePicker";
 
 const weekdayOptions: { key: Weekday; label: string }[] = [
   { key: "Mon", label: "月" },
@@ -14,18 +15,52 @@ const weekdayOptions: { key: Weekday; label: string }[] = [
 
 type AlarmFormProps = {
   onSubmit: (payload: NewAlarmPayload) => Promise<void>;
+  onSuccess?: () => void;
+  initialValues?: Partial<NewAlarmPayload>;
+  heading?: string;
+  submitLabel?: string;
+  submittingLabel?: string;
 };
 
 const defaultTime = (): string => dayjs().add(10, "minute").format("HH:mm");
+const defaultWeekdays = (): Weekday[] => ["Mon", "Tue", "Wed", "Thu", "Fri"];
 
-const AlarmForm = ({ onSubmit }: AlarmFormProps) => {
-  const [title, setTitle] = useState("");
-  const [timeLabel, setTimeLabel] = useState(defaultTime());
-  const [url, setUrl] = useState("");
-  const [repeatEnabled, setRepeatEnabled] = useState(false);
-  const [repeatDays, setRepeatDays] = useState<Weekday[]>(["Mon", "Tue", "Wed", "Thu", "Fri"]);
+const DEFAULT_LEAD_MINUTES = 3;
+
+const AlarmForm = ({
+  onSubmit,
+  onSuccess,
+  initialValues,
+  heading,
+  submitLabel,
+  submittingLabel
+}: AlarmFormProps) => {
+  const [title, setTitle] = useState(initialValues?.title ?? "");
+  const [timeLabel, setTimeLabel] = useState(initialValues?.timeLabel ?? defaultTime());
+  const [url, setUrl] = useState(initialValues?.url ?? "");
+  const [repeatEnabled, setRepeatEnabled] = useState(initialValues?.repeatEnabled ?? false);
+  const [repeatDays, setRepeatDays] = useState<Weekday[]>(
+    initialValues?.repeatDays && initialValues.repeatDays.length > 0
+      ? [...initialValues.repeatDays]
+      : defaultWeekdays()
+  );
+  const [leadMinutes, setLeadMinutes] = useState(initialValues?.leadMinutes ?? DEFAULT_LEAD_MINUTES);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!initialValues) return;
+    setTitle(initialValues.title ?? "");
+    setTimeLabel(initialValues.timeLabel ?? defaultTime());
+    setUrl(initialValues.url ?? "");
+    setRepeatEnabled(initialValues.repeatEnabled ?? false);
+    setRepeatDays(
+      initialValues.repeatDays && initialValues.repeatDays.length > 0
+        ? [...initialValues.repeatDays]
+        : defaultWeekdays()
+    );
+    setLeadMinutes(initialValues.leadMinutes ?? DEFAULT_LEAD_MINUTES);
+  }, [initialValues]);
 
   const disableSubmit = useMemo(() => {
     if (!timeLabel) return true;
@@ -37,6 +72,10 @@ const AlarmForm = ({ onSubmit }: AlarmFormProps) => {
     setRepeatDays((prev) =>
       prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
     );
+  };
+
+  const toggleRepeat = () => {
+    setRepeatEnabled((prev) => !prev);
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -57,13 +96,16 @@ const AlarmForm = ({ onSubmit }: AlarmFormProps) => {
         timeLabel,
         url: trimmedUrl || undefined,
         repeatEnabled,
-        repeatDays
+        repeatDays,
+        leadMinutes
       });
       setTitle("");
       setTimeLabel(defaultTime());
       setUrl("");
       setRepeatEnabled(false);
-      setRepeatDays(["Mon", "Tue", "Wed", "Thu", "Fri"]);
+      setRepeatDays(defaultWeekdays());
+      setLeadMinutes(DEFAULT_LEAD_MINUTES);
+      onSuccess?.();
     } catch (err) {
       console.error(err);
       setError("アラームの追加に失敗しました。");
@@ -74,7 +116,30 @@ const AlarmForm = ({ onSubmit }: AlarmFormProps) => {
 
   return (
     <form className="card" onSubmit={handleSubmit}>
-      <h2>新規アラーム追加</h2>
+      <h2>{heading ?? "新規アラーム追加"}</h2>
+      <div className="form-row">
+        <span>時刻</span>
+        <TimePicker value={timeLabel} onChange={setTimeLabel} />
+      </div>
+      <label className="form-row">
+        <span>何分前に鳴らすか</span>
+        <input
+          type="number"
+          min={0}
+          max={720}
+          step={1}
+          value={leadMinutes}
+          onChange={(event) => {
+            const parsed = Number(event.target.value);
+            if (!Number.isFinite(parsed)) {
+              setLeadMinutes(0);
+              return;
+            }
+            const clamped = Math.max(0, Math.min(720, Math.floor(parsed)));
+            setLeadMinutes(clamped);
+          }}
+        />
+      </label>
       <label className="form-row">
         <span>タイトル（任意）</span>
         <input
@@ -82,15 +147,6 @@ const AlarmForm = ({ onSubmit }: AlarmFormProps) => {
           value={title}
           placeholder="例：朝会（空欄でも可）"
           onChange={(e) => setTitle(e.target.value)}
-        />
-      </label>
-      <label className="form-row">
-        <span>時刻</span>
-        <input
-          type="time"
-          value={timeLabel}
-          onChange={(e) => setTimeLabel(e.target.value)}
-          required
         />
       </label>
       <label className="form-row">
@@ -102,14 +158,29 @@ const AlarmForm = ({ onSubmit }: AlarmFormProps) => {
           onChange={(e) => setUrl(e.target.value)}
         />
       </label>
-      <label className="form-row checkbox-row">
-        <input
-          type="checkbox"
-          checked={repeatEnabled}
-          onChange={(e) => setRepeatEnabled(e.target.checked)}
-        />
-        <span>繰り返しを有効にする</span>
-      </label>
+      <div className="form-row">
+        <div className="alarm-repeat-row form-repeat-row">
+          <span className="alarm-repeat-label">繰り返しを有効にする</span>
+          <div
+            className={
+              repeatEnabled
+                ? "alarm-switch repeat-toggle-switch active"
+                : "alarm-switch repeat-toggle-switch"
+            }
+            role="switch"
+            aria-checked={repeatEnabled}
+            aria-label="繰り返しを有効にする"
+            tabIndex={0}
+            onClick={toggleRepeat}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                toggleRepeat();
+              }
+            }}
+          />
+        </div>
+      </div>
       {repeatEnabled && (
         <div className="weekday-grid">
           {weekdayOptions.map((option) => (
@@ -128,8 +199,8 @@ const AlarmForm = ({ onSubmit }: AlarmFormProps) => {
         <p className="error-text">繰り返しが ON の場合は曜日を 1 つ以上選択してください。</p>
       )}
       {error && <p className="error-text">{error}</p>}
-      <button type="submit" disabled={disableSubmit}>
-        {submitting ? "追加中..." : "アラームを追加"}
+      <button type="submit" className="form-submit-btn" disabled={disableSubmit}>
+        {submitting ? submittingLabel ?? "追加中..." : submitLabel ?? "アラームを追加"}
       </button>
     </form>
   );

@@ -1,1 +1,1 @@
-{"root":["./src/app.tsx","./src/main.tsx","./src/components/alarmdialog.tsx","./src/components/alarmform.tsx","./src/components/alarmlist.tsx","./src/types/alarm.ts"],"version":"5.9.3"}
+{"root":["./src/app.tsx","./src/main.tsx","./src/components/addalarmmodal.tsx","./src/components/alarmdialog.tsx","./src/components/alarmform.tsx","./src/components/alarmlist.tsx","./src/components/timepicker.tsx","./src/types/alarm.ts"],"version":"5.9.3"}

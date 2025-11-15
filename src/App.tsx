@@ -1,19 +1,22 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { Alarm, NewAlarmPayload } from "./types/alarm";
-import AlarmForm from "./components/AlarmForm";
 import AlarmList from "./components/AlarmList";
 import AlarmDialog from "./components/AlarmDialog";
+import AddAlarmModal from "./components/AddAlarmModal";
 
 const App = () => {
   const [alarms, setAlarms] = useState<Alarm[]>([]);
   const [activeAlarm, setActiveAlarm] = useState<Alarm | null>(null);
+  const [editingAlarm, setEditingAlarm] = useState<Alarm | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const oscillatorRef = useRef<OscillatorNode | null>(null);
+  const oscillatorsRef = useRef<OscillatorNode[]>([]);
 
   const refresh = useCallback(async () => {
     try {
@@ -40,27 +43,73 @@ const App = () => {
     };
   }, [refresh]);
 
+  const cleanupTone = () => {
+    oscillatorsRef.current = [];
+    const ctx = audioCtxRef.current;
+    audioCtxRef.current = null;
+    if (ctx) {
+      void ctx.close();
+    }
+  };
+
   const startTone = () => {
-    // Web Audio API でシンプルなビープ音を生成してループする
+    // 卓上ベルのような金属的な減衰音を生成する
     if (audioCtxRef.current) return;
     const ctx = new AudioContext();
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.type = "sine";
-    osc.frequency.value = 880;
-    gain.gain.value = 0.1;
-    osc.connect(gain).connect(ctx.destination);
-    osc.start();
+    const now = ctx.currentTime;
+    const masterGain = ctx.createGain();
+    masterGain.gain.setValueAtTime(0.18, now);
+    masterGain.connect(ctx.destination);
+
+    const partials = [
+      { freq: 1980, decay: 3, level: 1 },
+      { freq: 990, decay: 3.4, level: 0.55 },
+      { freq: 2960, decay: 2.1, level: 0.4 },
+      { freq: 4050, decay: 1.2, level: 0.3 },
+    ];
+
+    let remaining = partials.length;
+    const handleEnded = () => {
+      remaining -= 1;
+      if (remaining === 0) {
+        cleanupTone();
+      }
+    };
+
+    const activeOscillators: OscillatorNode[] = [];
+    partials.forEach(({ freq, decay, level }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now);
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.3 * level, now + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + decay);
+
+      osc.connect(gain).connect(masterGain);
+      osc.start(now);
+      osc.stop(now + decay);
+      osc.onended = handleEnded;
+      activeOscillators.push(osc);
+    });
+
     audioCtxRef.current = ctx;
-    oscillatorRef.current = osc;
+    oscillatorsRef.current = activeOscillators;
   };
 
   const stopTone = () => {
-    oscillatorRef.current?.stop();
-    oscillatorRef.current?.disconnect();
-    audioCtxRef.current?.close();
-    oscillatorRef.current = null;
-    audioCtxRef.current = null;
+    if (!audioCtxRef.current) return;
+    oscillatorsRef.current.forEach((osc) => {
+      osc.onended = null;
+      try {
+        osc.stop();
+      } catch {
+        // stop は終了後に呼ぶと例外になるため握りつぶす
+      }
+    });
+    cleanupTone();
   };
 
   const handleCreate = async (payload: NewAlarmPayload) => {
@@ -73,12 +122,6 @@ const App = () => {
     setAlarms(updated);
   };
 
-  const handleTitleChange = async (id: string, title: string) => {
-    const trimmed = title.trim();
-    const updated = await invoke<Alarm[]>("update_alarm_title", { id, title: trimmed });
-    setAlarms(updated);
-  };
-
   const handleOpenUrl = useCallback(async (url: string) => {
     try {
       await openUrl(url);
@@ -87,10 +130,38 @@ const App = () => {
     }
   }, []);
 
+  const handleSelectAlarm = (alarm: Alarm) => {
+    setEditingAlarm(alarm);
+    setIsEditOpen(true);
+  };
+
+  const editingInitialValues = useMemo(() => {
+    if (!editingAlarm) return undefined;
+    return {
+      title: editingAlarm.title,
+      timeLabel: editingAlarm.timeLabel,
+      url: editingAlarm.url,
+      repeatEnabled: editingAlarm.repeatEnabled,
+      repeatDays: editingAlarm.repeatDays,
+      leadMinutes: editingAlarm.leadMinutes ?? 3,
+    };
+  }, [editingAlarm]);
+
+  const handleUpdate = async (payload: NewAlarmPayload) => {
+    if (!editingAlarm) return;
+    const updated = await invoke<Alarm[]>("update_alarm", {
+      id: editingAlarm.id,
+      payload,
+    });
+    setAlarms(updated);
+  };
+
   const handleStop = async () => {
     if (!activeAlarm) return;
     try {
-      const updated = await invoke<Alarm[]>("acknowledge_alarm", { id: activeAlarm.id });
+      const updated = await invoke<Alarm[]>("acknowledge_alarm", {
+        id: activeAlarm.id,
+      });
       setAlarms(updated);
     } catch (err) {
       console.error(err);
@@ -104,21 +175,49 @@ const App = () => {
     <main className="container">
       <header>
         <h1>Sebastian</h1>
-        <p className="subtitle">軽量な Tauri 製アラームツール</p>
+        <p className="subtitle">Midnight feathers chase quiet echoes.</p>
       </header>
       {error && <p className="error-text">{error}</p>}
-      <AlarmForm onSubmit={handleCreate} />
       {loading ? (
         <p>読み込み中...</p>
       ) : (
         <AlarmList
           alarms={alarms}
           onDelete={handleDelete}
-          onTitleChange={handleTitleChange}
           onOpenUrl={handleOpenUrl}
+          onSelect={handleSelectAlarm}
         />
       )}
-      <AlarmDialog alarm={activeAlarm} onStop={handleStop} onOpenUrl={handleOpenUrl} />
+      <button
+        type="button"
+        className="add-button floating-add"
+        onClick={() => setIsFormOpen(true)}
+        aria-label="アラームを追加"
+      >
+        ＋ アラーム追加
+      </button>
+      <AlarmDialog
+        alarm={activeAlarm}
+        onStop={handleStop}
+        onOpenUrl={handleOpenUrl}
+      />
+      <AddAlarmModal
+        open={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        onSubmit={handleCreate}
+      />
+      <AddAlarmModal
+        open={isEditOpen && !!editingAlarm}
+        onClose={() => {
+          setIsEditOpen(false);
+          setEditingAlarm(null);
+        }}
+        onSubmit={handleUpdate}
+        initialValues={editingInitialValues}
+        heading="アラーム編集"
+        submitLabel="保存する"
+        submittingLabel="保存中..."
+      />
     </main>
   );
 };
