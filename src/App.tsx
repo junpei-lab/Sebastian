@@ -8,6 +8,39 @@ import AlarmDialog from "./components/AlarmDialog";
 import AddAlarmModal from "./components/AddAlarmModal";
 import ImportAlarmsModal from "./components/ImportAlarmsModal";
 
+const SUBTITLE_OPTIONS = [
+  "Midnight feathers chase quiet echoes.",
+  "Neon embers waltz through painted fog.",
+  "Paper stars drift across velvet tides.",
+  "Clockwork fireflies trace forgotten maps.",
+  "Silver lanterns guard the sleepless harbor.",
+  "Echoing footfalls stitch together dawn.",
+  "Glass comets hum above the empty square.",
+  "Ancient ravens translate cooling embers.",
+  "Hidden rivers murmur beneath the rails.",
+  "Frosted violets memorize the skyline.",
+  "Lantern-lit moths rehearse for solstice.",
+  "Satellite petals orbit borrowed dreams.",
+  "Crimson quills sketch ultraviolet rain.",
+  "Opal whispers anchor restless balloons.",
+  "Moonlit ciphers cradle patient ghosts.",
+  "Transient zephyrs tune the distant bells.",
+  "Velvet lighthouses pulse beneath the waves.",
+  "Magnetic snowflakes choreograph the rooftops.",
+  "Steam-born sparrows catalog the skyline.",
+  "Twilight circuits echo through hollow trees.",
+  "Saffron halos crown the quiet avenue.",
+  "Paper zeppelins ferry half-remembered songs.",
+  "Suspended violins sip from silent wells.",
+  "Azure embers navigate the sleepless pier.",
+  "Collapsing halos frame the wandering choir.",
+  "Celestial bridges braid the cinder clouds.",
+  "Mercury gulls patrol the lantern lakes.",
+  "Harmonic raindrops polish weathered runes.",
+  "Obsidian swallows ferry the postal moon.",
+  "Serenade sparks bloom inside winter engines."
+] as const;
+
 const App = () => {
   const [alarms, setAlarms] = useState<Alarm[]>([]);
   const [activeAlarm, setActiveAlarm] = useState<Alarm | null>(null);
@@ -19,6 +52,10 @@ const App = () => {
   const [isImportOpen, setIsImportOpen] = useState(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const oscillatorsRef = useRef<OscillatorNode[]>([]);
+  const subtitleText = useMemo(() => {
+    const index = Math.floor(Math.random() * SUBTITLE_OPTIONS.length);
+    return SUBTITLE_OPTIONS[index];
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
@@ -188,7 +225,7 @@ const App = () => {
     <main className="container">
       <header>
         <h1>Sebastian</h1>
-        <p className="subtitle">Midnight feathers chase quiet echoes.</p>
+        <p className="subtitle">{subtitleText}</p>
       </header>
       <div className="toolbar">
         <button

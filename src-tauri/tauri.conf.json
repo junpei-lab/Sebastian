@@ -21,10 +21,6 @@
         "visible": true
       }
     ],
-    "trayIcon": {
-      "iconPath": "icons/tray_icon.png",
-      "iconAsTemplate": true
-    },
     "security": {
       "csp": null
     }

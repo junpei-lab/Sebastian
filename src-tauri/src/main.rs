@@ -5,6 +5,7 @@ mod alarm_store;
 use alarm_store::{Alarm, AlarmStore, NewAlarmPayload};
 use parking_lot::Mutex;
 use tauri::{
+    image::Image,
     menu::MenuBuilder,
     tray::{TrayIconBuilder, TrayIconEvent},
     AppHandle, Emitter, Manager, Runtime, State, WindowEvent,
@@ -18,6 +19,12 @@ struct AppState {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_single_instance::init(|app, _argv, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.show();
+                let _ = window.set_focus();
+            }
+        }))
         .setup(|app| {
             let data_dir = app
                 .path()
@@ -169,7 +176,10 @@ fn register_tray<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<()> {
         .text("quit", "終了")
         .build()?;
 
+    let tray_icon = Image::from_bytes(include_bytes!("../icons/tray_icon.png"))?;
+
     TrayIconBuilder::new()
+        .icon(tray_icon)
         .menu(&tray_menu)
         .on_menu_event(|app, event| handle_tray_menu_event(app, event.id().as_ref()))
         .on_tray_icon_event(|tray, event| {

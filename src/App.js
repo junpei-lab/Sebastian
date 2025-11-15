@@ -7,6 +7,38 @@ import AlarmList from "./components/AlarmList";
 import AlarmDialog from "./components/AlarmDialog";
 import AddAlarmModal from "./components/AddAlarmModal";
 import ImportAlarmsModal from "./components/ImportAlarmsModal";
+const SUBTITLE_OPTIONS = [
+    "Midnight feathers chase quiet echoes.",
+    "Neon embers waltz through painted fog.",
+    "Paper stars drift across velvet tides.",
+    "Clockwork fireflies trace forgotten maps.",
+    "Silver lanterns guard the sleepless harbor.",
+    "Echoing footfalls stitch together dawn.",
+    "Glass comets hum above the empty square.",
+    "Ancient ravens translate cooling embers.",
+    "Hidden rivers murmur beneath the rails.",
+    "Frosted violets memorize the skyline.",
+    "Lantern-lit moths rehearse for solstice.",
+    "Satellite petals orbit borrowed dreams.",
+    "Crimson quills sketch ultraviolet rain.",
+    "Opal whispers anchor restless balloons.",
+    "Moonlit ciphers cradle patient ghosts.",
+    "Transient zephyrs tune the distant bells.",
+    "Velvet lighthouses pulse beneath the waves.",
+    "Magnetic snowflakes choreograph the rooftops.",
+    "Steam-born sparrows catalog the skyline.",
+    "Twilight circuits echo through hollow trees.",
+    "Saffron halos crown the quiet avenue.",
+    "Paper zeppelins ferry half-remembered songs.",
+    "Suspended violins sip from silent wells.",
+    "Azure embers navigate the sleepless pier.",
+    "Collapsing halos frame the wandering choir.",
+    "Celestial bridges braid the cinder clouds.",
+    "Mercury gulls patrol the lantern lakes.",
+    "Harmonic raindrops polish weathered runes.",
+    "Obsidian swallows ferry the postal moon.",
+    "Serenade sparks bloom inside winter engines."
+];
 const App = () => {
     const [alarms, setAlarms] = useState([]);
     const [activeAlarm, setActiveAlarm] = useState(null);
@@ -18,6 +50,10 @@ const App = () => {
     const [isImportOpen, setIsImportOpen] = useState(false);
     const audioCtxRef = useRef(null);
     const oscillatorsRef = useRef([]);
+    const subtitleText = useMemo(() => {
+        const index = Math.floor(Math.random() * SUBTITLE_OPTIONS.length);
+        return SUBTITLE_OPTIONS[index];
+    }, []);
     const refresh = useCallback(async () => {
         try {
             const data = await invoke("list_alarms");
@@ -170,7 +206,7 @@ const App = () => {
             stopTone();
         }
     };
-    return (_jsxs("main", { className: "container", children: [_jsxs("header", { children: [_jsx("h1", { children: "Sebastian" }), _jsx("p", { className: "subtitle", children: "Midnight feathers chase quiet echoes." })] }), _jsx("div", { className: "toolbar", children: _jsx("button", { type: "button", className: "import-button", onClick: () => setIsImportOpen(true), children: "JSON \u304B\u3089\u30A4\u30F3\u30DD\u30FC\u30C8" }) }), error && _jsx("p", { className: "error-text", children: error }), loading ? (_jsx("p", { children: "\u8AAD\u307F\u8FBC\u307F\u4E2D..." })) : (_jsx(AlarmList, { alarms: alarms, onDelete: handleDelete, onOpenUrl: handleOpenUrl, onSelect: handleSelectAlarm })), _jsx("button", { type: "button", className: "add-button floating-add", onClick: () => setIsFormOpen(true), "aria-label": "\u30A2\u30E9\u30FC\u30E0\u3092\u8FFD\u52A0", children: "\uFF0B \u30A2\u30E9\u30FC\u30E0\u8FFD\u52A0" }), _jsx(AlarmDialog, { alarm: activeAlarm, onStop: handleStop, onOpenUrl: handleOpenUrl }), _jsx(AddAlarmModal, { open: isFormOpen, onClose: () => setIsFormOpen(false), onSubmit: handleCreate }), _jsx(AddAlarmModal, { open: isEditOpen && !!editingAlarm, onClose: () => {
+    return (_jsxs("main", { className: "container", children: [_jsxs("header", { children: [_jsx("h1", { children: "Sebastian" }), _jsx("p", { className: "subtitle", children: subtitleText })] }), _jsx("div", { className: "toolbar", children: _jsx("button", { type: "button", className: "import-button", onClick: () => setIsImportOpen(true), children: "JSON \u304B\u3089\u30A4\u30F3\u30DD\u30FC\u30C8" }) }), error && _jsx("p", { className: "error-text", children: error }), loading ? (_jsx("p", { children: "\u8AAD\u307F\u8FBC\u307F\u4E2D..." })) : (_jsx(AlarmList, { alarms: alarms, onDelete: handleDelete, onOpenUrl: handleOpenUrl, onSelect: handleSelectAlarm })), _jsx("button", { type: "button", className: "add-button floating-add", onClick: () => setIsFormOpen(true), "aria-label": "\u30A2\u30E9\u30FC\u30E0\u3092\u8FFD\u52A0", children: "\uFF0B \u30A2\u30E9\u30FC\u30E0\u8FFD\u52A0" }), _jsx(AlarmDialog, { alarm: activeAlarm, onStop: handleStop, onOpenUrl: handleOpenUrl }), _jsx(AddAlarmModal, { open: isFormOpen, onClose: () => setIsFormOpen(false), onSubmit: handleCreate }), _jsx(AddAlarmModal, { open: isEditOpen && !!editingAlarm, onClose: () => {
                     setIsEditOpen(false);
                     setEditingAlarm(null);
                 }, onSubmit: handleUpdate, initialValues: editingInitialValues, heading: "\u30A2\u30E9\u30FC\u30E0\u7DE8\u96C6", submitLabel: "\u4FDD\u5B58\u3059\u308B", submittingLabel: "\u4FDD\u5B58\u4E2D..." }), _jsx(ImportAlarmsModal, { open: isImportOpen, onClose: () => setIsImportOpen(false), onSubmit: handleImportSubmit })] }));
