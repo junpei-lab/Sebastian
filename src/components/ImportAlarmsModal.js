@@ -87,10 +87,11 @@ const normalizePayload = (value, index) => {
     const title = pickString(record, ["title"], index, "title");
     const timeLabel = pickString(record, ["timeLabel", "time_label"], index, "timeLabel");
     const url = pickOptionalString(record, ["url"]);
-    const repeatEnabledValue = pickOptional(record, ["repeatEnabled", "repeat_enabled"]);
-    const repeatEnabled = typeof repeatEnabledValue === "boolean" ? repeatEnabledValue : !!repeatEnabledValue;
     const repeatDaysValue = pickOptional(record, ["repeatDays", "repeat_days"]);
-    const repeatDays = normalizeRepeatDays(repeatDaysValue, repeatEnabled, index);
+    const repeatDays = normalizeRepeatDays(repeatDaysValue, index);
+    const repeatEnabledValue = pickOptional(record, ["repeatEnabled", "repeat_enabled"]);
+    const repeatEnabled = (typeof repeatEnabledValue === "boolean" ? repeatEnabledValue : !!repeatEnabledValue) &&
+        repeatDays.length > 0;
     const leadMinutesValue = pickOptional(record, ["leadMinutes", "lead_minutes"]);
     const leadMinutes = normalizeLeadMinutes(leadMinutesValue);
     return {
@@ -124,11 +125,8 @@ const pickOptionalString = (record, keys) => {
     }
     return undefined;
 };
-const normalizeRepeatDays = (value, repeatEnabled, index) => {
+const normalizeRepeatDays = (value, index) => {
     if (!value) {
-        if (repeatEnabled) {
-            throwRepeatError(index);
-        }
         return [];
     }
     const values = Array.isArray(value)
@@ -144,14 +142,10 @@ const normalizeRepeatDays = (value, repeatEnabled, index) => {
     const normalized = values
         .map((day) => (day.length ? (day[0].toUpperCase() + day.slice(1, 3).toLowerCase()) : day))
         .filter((day) => allowedWeekdays.includes(day));
-    const unique = Array.from(new Set(normalized));
-    if (repeatEnabled && unique.length === 0) {
-        throwRepeatError(index);
+    if (values.length > 0 && normalized.length === 0) {
+        throw new Error(`${index + 1} ??: repeatDays ????????????????`);
     }
-    return unique;
-};
-const throwRepeatError = (index) => {
-    throw new Error(`${index + 1} 件目: repeatDays が指定されていません。`);
+    return Array.from(new Set(normalized));
 };
 const normalizeLeadMinutes = (value) => {
     if (typeof value === "number" && Number.isFinite(value)) {

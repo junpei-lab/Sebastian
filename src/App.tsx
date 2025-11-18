@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useMemo, useRef, useState, ChangeEvent } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -41,6 +41,20 @@ const SUBTITLE_OPTIONS = [
   "Serenade sparks bloom inside winter engines."
 ] as const;
 
+const DEFAULT_LEAD_MINUTES = 3;
+const DEFAULT_LEAD_KEY = "sebastian:defaultLeadMinutes";
+
+const clampLeadMinutes = (value: number) =>
+  Math.max(0, Math.min(720, Math.floor(value)));
+
+const loadDefaultLeadMinutes = (): number => {
+  if (typeof window === "undefined") return DEFAULT_LEAD_MINUTES;
+  const stored = window.localStorage.getItem(DEFAULT_LEAD_KEY);
+  if (stored === null) return DEFAULT_LEAD_MINUTES;
+  const parsed = Number(stored);
+  return Number.isFinite(parsed) ? clampLeadMinutes(parsed) : DEFAULT_LEAD_MINUTES;
+};
+
 const App = () => {
   const [alarms, setAlarms] = useState<Alarm[]>([]);
   const [activeAlarm, setActiveAlarm] = useState<Alarm | null>(null);
@@ -50,6 +64,9 @@ const App = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [defaultLeadMinutes, setDefaultLeadMinutes] = useState<number>(() =>
+    loadDefaultLeadMinutes(),
+  );
   const audioCtxRef = useRef<AudioContext | null>(null);
   const oscillatorsRef = useRef<OscillatorNode[]>([]);
   const subtitleText = useMemo(() => {
@@ -92,7 +109,6 @@ const App = () => {
   };
 
   const startTone = () => {
-    // 卓上ベルのような金属的な減衰音を生成する
     if (audioCtxRef.current) return;
     const ctx = new AudioContext();
     const now = ctx.currentTime;
@@ -145,7 +161,7 @@ const App = () => {
       try {
         osc.stop();
       } catch {
-        // stop は終了後に呼ぶと例外になるため握りつぶす
+        // stop は終了間際に呼ぶと例外になるため握りつぶす
       }
     });
     cleanupTone();
@@ -174,6 +190,16 @@ const App = () => {
     setIsEditOpen(true);
   };
 
+  const handleDefaultLeadInput = (event: ChangeEvent<HTMLInputElement>) => {
+    const parsed = Number(event.target.value);
+    const normalized = Number.isFinite(parsed) ? parsed : 0;
+    const clamped = clampLeadMinutes(normalized);
+    setDefaultLeadMinutes(clamped);
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem(DEFAULT_LEAD_KEY, clamped.toString());
+    }
+  };
+
   const editingInitialValues = useMemo(() => {
     if (!editingAlarm) return undefined;
     return {
@@ -182,9 +208,9 @@ const App = () => {
       url: editingAlarm.url,
       repeatEnabled: editingAlarm.repeatEnabled,
       repeatDays: editingAlarm.repeatDays,
-      leadMinutes: editingAlarm.leadMinutes ?? 3,
+      leadMinutes: editingAlarm.leadMinutes ?? defaultLeadMinutes,
     };
-  }, [editingAlarm]);
+  }, [editingAlarm, defaultLeadMinutes]);
 
   const handleUpdate = async (payload: NewAlarmPayload) => {
     if (!editingAlarm) return;
@@ -201,7 +227,7 @@ const App = () => {
   ) => {
     const updated = await invoke<Alarm[]>("import_alarms", {
       payloads,
-      replace_existing: replaceExisting,
+      replaceExisting,
     });
     setAlarms(updated);
   };
@@ -228,6 +254,18 @@ const App = () => {
         <p className="subtitle">{subtitleText}</p>
       </header>
       <div className="toolbar">
+        <label className="default-lead-control">
+          <span>デフォルトリード (分)</span>
+          <input
+            type="number"
+            min={0}
+            max={720}
+            step={1}
+            value={defaultLeadMinutes}
+            onChange={handleDefaultLeadInput}
+            aria-label="デフォルト leadMinutes"
+          />
+        </label>
         <button
           type="button"
           className="import-button"
@@ -264,6 +302,7 @@ const App = () => {
         open={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         onSubmit={handleCreate}
+        defaultLeadMinutes={defaultLeadMinutes}
       />
       <AddAlarmModal
         open={isEditOpen && !!editingAlarm}
@@ -273,6 +312,7 @@ const App = () => {
         }}
         onSubmit={handleUpdate}
         initialValues={editingInitialValues}
+        defaultLeadMinutes={defaultLeadMinutes}
         heading="アラーム編集"
         submitLabel="保存する"
         submittingLabel="保存中..."

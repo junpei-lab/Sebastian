@@ -39,6 +39,18 @@ const SUBTITLE_OPTIONS = [
     "Obsidian swallows ferry the postal moon.",
     "Serenade sparks bloom inside winter engines."
 ];
+const DEFAULT_LEAD_MINUTES = 3;
+const DEFAULT_LEAD_KEY = "sebastian:defaultLeadMinutes";
+const clampLeadMinutes = (value) => Math.max(0, Math.min(720, Math.floor(value)));
+const loadDefaultLeadMinutes = () => {
+    if (typeof window === "undefined")
+        return DEFAULT_LEAD_MINUTES;
+    const stored = window.localStorage.getItem(DEFAULT_LEAD_KEY);
+    if (stored === null)
+        return DEFAULT_LEAD_MINUTES;
+    const parsed = Number(stored);
+    return Number.isFinite(parsed) ? clampLeadMinutes(parsed) : DEFAULT_LEAD_MINUTES;
+};
 const App = () => {
     const [alarms, setAlarms] = useState([]);
     const [activeAlarm, setActiveAlarm] = useState(null);
@@ -48,6 +60,7 @@ const App = () => {
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isEditOpen, setIsEditOpen] = useState(false);
     const [isImportOpen, setIsImportOpen] = useState(false);
+    const [defaultLeadMinutes, setDefaultLeadMinutes] = useState(() => loadDefaultLeadMinutes());
     const audioCtxRef = useRef(null);
     const oscillatorsRef = useRef([]);
     const subtitleText = useMemo(() => {
@@ -88,7 +101,6 @@ const App = () => {
         }
     };
     const startTone = () => {
-        // 卓上ベルのような金属的な減衰音を生成する
         if (audioCtxRef.current)
             return;
         const ctx = new AudioContext();
@@ -136,7 +148,7 @@ const App = () => {
                 osc.stop();
             }
             catch {
-                // stop は終了後に呼ぶと例外になるため握りつぶす
+                // stop は終了間際に呼ぶと例外になるため握りつぶす
             }
         });
         cleanupTone();
@@ -161,6 +173,15 @@ const App = () => {
         setEditingAlarm(alarm);
         setIsEditOpen(true);
     };
+    const handleDefaultLeadInput = (event) => {
+        const parsed = Number(event.target.value);
+        const normalized = Number.isFinite(parsed) ? parsed : 0;
+        const clamped = clampLeadMinutes(normalized);
+        setDefaultLeadMinutes(clamped);
+        if (typeof window !== "undefined") {
+            window.localStorage.setItem(DEFAULT_LEAD_KEY, clamped.toString());
+        }
+    };
     const editingInitialValues = useMemo(() => {
         if (!editingAlarm)
             return undefined;
@@ -170,9 +191,9 @@ const App = () => {
             url: editingAlarm.url,
             repeatEnabled: editingAlarm.repeatEnabled,
             repeatDays: editingAlarm.repeatDays,
-            leadMinutes: editingAlarm.leadMinutes ?? 3,
+            leadMinutes: editingAlarm.leadMinutes ?? defaultLeadMinutes,
         };
-    }, [editingAlarm]);
+    }, [editingAlarm, defaultLeadMinutes]);
     const handleUpdate = async (payload) => {
         if (!editingAlarm)
             return;
@@ -185,7 +206,7 @@ const App = () => {
     const handleImportSubmit = async (payloads, replaceExisting) => {
         const updated = await invoke("import_alarms", {
             payloads,
-            replace_existing: replaceExisting,
+            replaceExisting,
         });
         setAlarms(updated);
     };
@@ -206,9 +227,9 @@ const App = () => {
             stopTone();
         }
     };
-    return (_jsxs("main", { className: "container", children: [_jsxs("header", { children: [_jsx("h1", { children: "Sebastian" }), _jsx("p", { className: "subtitle", children: subtitleText })] }), _jsx("div", { className: "toolbar", children: _jsx("button", { type: "button", className: "import-button", onClick: () => setIsImportOpen(true), children: "JSON \u304B\u3089\u30A4\u30F3\u30DD\u30FC\u30C8" }) }), error && _jsx("p", { className: "error-text", children: error }), loading ? (_jsx("p", { children: "\u8AAD\u307F\u8FBC\u307F\u4E2D..." })) : (_jsx(AlarmList, { alarms: alarms, onDelete: handleDelete, onOpenUrl: handleOpenUrl, onSelect: handleSelectAlarm })), _jsx("button", { type: "button", className: "add-button floating-add", onClick: () => setIsFormOpen(true), "aria-label": "\u30A2\u30E9\u30FC\u30E0\u3092\u8FFD\u52A0", children: "\uFF0B \u30A2\u30E9\u30FC\u30E0\u8FFD\u52A0" }), _jsx(AlarmDialog, { alarm: activeAlarm, onStop: handleStop, onOpenUrl: handleOpenUrl }), _jsx(AddAlarmModal, { open: isFormOpen, onClose: () => setIsFormOpen(false), onSubmit: handleCreate }), _jsx(AddAlarmModal, { open: isEditOpen && !!editingAlarm, onClose: () => {
+    return (_jsxs("main", { className: "container", children: [_jsxs("header", { children: [_jsx("h1", { children: "Sebastian" }), _jsx("p", { className: "subtitle", children: subtitleText })] }), _jsxs("div", { className: "toolbar", children: [_jsxs("label", { className: "default-lead-control", children: [_jsx("span", { children: "\u30C7\u30D5\u30A9\u30EB\u30C8\u30EA\u30FC\u30C9 (\u5206)" }), _jsx("input", { type: "number", min: 0, max: 720, step: 1, value: defaultLeadMinutes, onChange: handleDefaultLeadInput, "aria-label": "\u30C7\u30D5\u30A9\u30EB\u30C8 leadMinutes" })] }), _jsx("button", { type: "button", className: "import-button", onClick: () => setIsImportOpen(true), children: "JSON \u304B\u3089\u30A4\u30F3\u30DD\u30FC\u30C8" })] }), error && _jsx("p", { className: "error-text", children: error }), loading ? (_jsx("p", { children: "\u8AAD\u307F\u8FBC\u307F\u4E2D..." })) : (_jsx(AlarmList, { alarms: alarms, onDelete: handleDelete, onOpenUrl: handleOpenUrl, onSelect: handleSelectAlarm })), _jsx("button", { type: "button", className: "add-button floating-add", onClick: () => setIsFormOpen(true), "aria-label": "\u30A2\u30E9\u30FC\u30E0\u3092\u8FFD\u52A0", children: "\uFF0B \u30A2\u30E9\u30FC\u30E0\u8FFD\u52A0" }), _jsx(AlarmDialog, { alarm: activeAlarm, onStop: handleStop, onOpenUrl: handleOpenUrl }), _jsx(AddAlarmModal, { open: isFormOpen, onClose: () => setIsFormOpen(false), onSubmit: handleCreate, defaultLeadMinutes: defaultLeadMinutes }), _jsx(AddAlarmModal, { open: isEditOpen && !!editingAlarm, onClose: () => {
                     setIsEditOpen(false);
                     setEditingAlarm(null);
-                }, onSubmit: handleUpdate, initialValues: editingInitialValues, heading: "\u30A2\u30E9\u30FC\u30E0\u7DE8\u96C6", submitLabel: "\u4FDD\u5B58\u3059\u308B", submittingLabel: "\u4FDD\u5B58\u4E2D..." }), _jsx(ImportAlarmsModal, { open: isImportOpen, onClose: () => setIsImportOpen(false), onSubmit: handleImportSubmit })] }));
+                }, onSubmit: handleUpdate, initialValues: editingInitialValues, defaultLeadMinutes: defaultLeadMinutes, heading: "\u30A2\u30E9\u30FC\u30E0\u7DE8\u96C6", submitLabel: "\u4FDD\u5B58\u3059\u308B", submittingLabel: "\u4FDD\u5B58\u4E2D..." }), _jsx(ImportAlarmsModal, { open: isImportOpen, onClose: () => setIsImportOpen(false), onSubmit: handleImportSubmit })] }));
 };
 export default App;

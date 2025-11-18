@@ -6,6 +6,7 @@ type AddAlarmModalProps = {
   onClose: () => void;
   onSubmit: (payload: NewAlarmPayload) => Promise<void>;
   initialValues?: Partial<NewAlarmPayload>;
+  defaultLeadMinutes: number;
   heading?: string;
   submitLabel?: string;
   submittingLabel?: string;
@@ -16,6 +17,7 @@ const AddAlarmModal = ({
   onClose,
   onSubmit,
   initialValues,
+  defaultLeadMinutes,
   heading,
   submitLabel,
   submittingLabel
@@ -36,6 +38,7 @@ const AddAlarmModal = ({
           onSubmit={onSubmit}
           onSuccess={onClose}
           initialValues={initialValues}
+          defaultLeadMinutes={defaultLeadMinutes}
           heading={heading}
           submitLabel={submitLabel}
           submittingLabel={submittingLabel}

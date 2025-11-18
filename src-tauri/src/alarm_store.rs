@@ -81,11 +81,7 @@ fn build_alarm_from_payload(payload: NewAlarmPayload, now: DateTime<Local>) -> R
         repeat_days,
         lead_minutes,
     } = payload;
-    if repeat_enabled && repeat_days.is_empty() {
-        return Err(anyhow!(
-            "繰り返しが ON の場合は曜日を 1 つ以上指定してください。"
-        ));
-    }
+    let repeat_enabled = repeat_enabled && !repeat_days.is_empty();
     let title = title.trim().to_string();
     let time_label = time_label.trim().to_string();
     let lead_minutes = clamp_lead_minutes(lead_minutes);

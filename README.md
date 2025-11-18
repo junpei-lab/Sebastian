@@ -9,12 +9,12 @@ _Midnight feathers chase quiet echoes._
 ## 主な特徴
 
 - Vite + Tailwind ベースの SPA と Tauri 2.0 バックエンドによる軽量で高速なデスクトップ体験。
-- 時刻・タイトル・URL・繰り返し曜日・リードタイム（0〜720 分前）を備えた複数アラームの追加 / 編集 / 削除。
-- Web Audio API で合成した減衰ベル音とフルスクリーンダイアログで見逃さない通知。
+- 時刻・タイトル・URL・繰り返し曜日・リードタイム（0〜720 分前）を備えた柔軟なアラームの追加 / 編集 / 削除。
+- Web Audio API で合成した減衰ベル音とフルスクリーンダイアログで見逃しにくい通知。
 - アプリを閉じてもタスクトレイに常駐し、ダブルクリックやメニューから即座に復帰・終了。
-- JSON インポートで `alarms.json` や配列形式のデータを検証付きで取り込み、既存アラームの置換にも対応。
+- JSON インポートで `alarms.json` 互換データを検証付きで取り込み、既存アラームの置換にも対応。
 - `alarms.json` は OS ごとのアプリデータディレクトリへ保存され、再起動後もアラームを維持。
-
+- ツールバーでデフォルトのリードタイム（leadMinutes）を 0〜720 分で設定でき、新規/編集フォームの初期値として反映。
 ## システム構成
 
 ### フロントエンド (Vite + React + TypeScript)
@@ -144,29 +144,67 @@ Rust 側の単体テスト（必要に応じて `alarm_store.rs` に追加）と
     "url": "https://example.com/standup",
     "repeatEnabled": true,
     "repeatDays": ["Mon", "Tue", "Wed", "Thu", "Fri"],
-    "leadMinutes": 3
+    "leadMinutes": 0
   }
 ]
 ```
 
-| フィールド                     | 説明                                                                                    |
-| ------------------------------ | --------------------------------------------------------------------------------------- |
-| `timeLabel`                    | 24 時間表記 (HH:mm)。`leadMinutes` 分前に鳴ります。                                     |
-| `nextFireTime`                 | ISO 8601。`leadMinutes` 適用後の次回鳴動時刻（ローカルタイムゾーン）。                  |
-| `leadMinutes`                  | 0〜720。イベントの何分前に鳴らすか。UI ではデフォルト 3 分。                            |
-| `repeatEnabled` + `repeatDays` | `Mon` 〜 `Sun`（PascalCase）で曜日を指定。ON で `repeatDays` が空だとエラーになります。 |
-| `url`                          | 任意。`http://` / `https://` のみ保存。                                                 |
-| `title`                        | 空欄可。UI では未設定時に「タイトル未設定」と表示。                                     |
+| フィールド                     | 説明                                                                                          |
+| ------------------------------ | --------------------------------------------------------------------------------------------- |
+| `timeLabel`                    | 24 時間表記 (HH:mm)。`leadMinutes` 分前に鳴ります。                                          |
+| `nextFireTime`                 | ISO 8601。`leadMinutes` 適用後の次回鳴動時刻（ローカルタイムゾーン）。                      |
+| `leadMinutes`                  | 0〜720。イベントの何分前に鳴らすか。ツールバーで設定したデフォルト値（初期値は 3 分）がフォームの初期値。 |
+| `repeatEnabled` + `repeatDays` | `Mon`〜`Sun`（PascalCase）で曜日を指定。空配列や省略時は単発扱いになり、自動で `repeatEnabled=false` になります。 |
+| `url`                          | 任意。`http://` / `https://` のみ保存。                                                       |
+| `title`                        | 任意。UI では未入力時に「タイトルを設定」と表示。                                            |
 
 ## JSON インポート
 
-画面右上の「JSON からインポート」ボタンから以下の形式を貼り付けできます。
+同梱の「JSON からインポート」ボタンでは、次のようなデータ形式を貼り付けできます。
 
-- 素の配列: `[ { ... }, { ... } ]`
-- または `{ "alarms": [ ... ] }`
+- 配列: `[ { ... }, { ... } ]`
+- もしくは `{ "alarms": [ ... ] }`
 
-許可されるキーは `camelCase`/`snake_case` 両対応です（例: `timeLabel` / `time_label`）。不足フィールドは検証時にエラーとなり、`leadMinutes` は省略すると 3 に丸められます。`「既存のアラームを全て削除してから取り込む」` を有効にすると `replace_existing=true` で `AlarmStore` を初期化します。取り込み後は一覧が直ちに再読み込みされます。
+### サンプル（配列）
 
+```json
+[
+  {
+    "title": "Daily standup",
+    "timeLabel": "09:55",
+    "repeatEnabled": true,
+    "repeatDays": ["Mon", "Tue", "Wed", "Thu", "Fri"],
+    "leadMinutes": 5,
+    "url": "https://example.com/standup"
+  },
+  {
+    "title": "One-off reminder",
+    "timeLabel": "15:00",
+    "repeatEnabled": false,
+    "repeatDays": [],
+    "leadMinutes": 10
+  }
+]
+```
+
+### サンプル（`alarms.json` オブジェクト）
+
+```json
+{
+  "alarms": [
+    {
+      "title": "Weekly sync",
+      "timeLabel": "13:30",
+      "repeatEnabled": true,
+      "repeatDays": "Mon,Thu",
+      "leadMinutes": 0
+    }
+  ],
+  "version": 1
+}
+```
+
+許可されるキーは `camelCase`/`snake_case` 両対応です（例: `timeLabel` / `time_label`）。不足フィールドは検証時にエラーとなり、`leadMinutes` は省略すると 3 に丸められます。「既存のアラームを全て削除してから取り込む」を有効にすると `replace_existing=true` で `AlarmStore` を初期化します。取り込み後は一覧が直ちに再読み込みされます。`repeatDays` を省略または空配列にした場合は単発アラームとして扱われ、自動で `repeatEnabled=false` になります。文字列・配列で渡した曜日は `Mon`〜`Sun` のうち有効なものだけが採用されます。
 ## アラーム動作
 
 1. 追加/更新時に Rust 側で `chrono` を使って次回発火時刻を計算し、`alarms.json` を保存します。

@@ -149,11 +149,12 @@ const normalizePayload = (value: unknown, index: number): NewAlarmPayload => {
   const title = pickString(record, ["title"], index, "title");
   const timeLabel = pickString(record, ["timeLabel", "time_label"], index, "timeLabel");
   const url = pickOptionalString(record, ["url"]);
+  const repeatDaysValue = pickOptional(record, ["repeatDays", "repeat_days"]);
+  const repeatDays = normalizeRepeatDays(repeatDaysValue, index);
   const repeatEnabledValue = pickOptional(record, ["repeatEnabled", "repeat_enabled"]);
   const repeatEnabled =
-    typeof repeatEnabledValue === "boolean" ? repeatEnabledValue : !!repeatEnabledValue;
-  const repeatDaysValue = pickOptional(record, ["repeatDays", "repeat_days"]);
-  const repeatDays = normalizeRepeatDays(repeatDaysValue, repeatEnabled, index);
+    (typeof repeatEnabledValue === "boolean" ? repeatEnabledValue : !!repeatEnabledValue) &&
+    repeatDays.length > 0;
   const leadMinutesValue = pickOptional(record, ["leadMinutes", "lead_minutes"]);
   const leadMinutes = normalizeLeadMinutes(leadMinutesValue);
 
@@ -197,15 +198,8 @@ const pickOptionalString = (record: Record<string, unknown>, keys: string[]): st
   return undefined;
 };
 
-const normalizeRepeatDays = (
-  value: unknown,
-  repeatEnabled: boolean,
-  index: number
-): Weekday[] => {
+const normalizeRepeatDays = (value: unknown, index: number): Weekday[] => {
   if (!value) {
-    if (repeatEnabled) {
-      throwRepeatError(index);
-    }
     return [];
   }
   const values: string[] = Array.isArray(value)
@@ -221,15 +215,10 @@ const normalizeRepeatDays = (
   const normalized = values
     .map((day) => (day.length ? (day[0].toUpperCase() + day.slice(1, 3).toLowerCase()) : day))
     .filter((day): day is Weekday => allowedWeekdays.includes(day as Weekday));
-  const unique = Array.from(new Set(normalized));
-  if (repeatEnabled && unique.length === 0) {
-    throwRepeatError(index);
+  if (values.length > 0 && normalized.length === 0) {
+    throw new Error(`${index + 1} ??: repeatDays ????????????????`);
   }
-  return unique;
-};
-
-const throwRepeatError = (index: number): never => {
-  throw new Error(`${index + 1} 件目: repeatDays が指定されていません。`);
+  return Array.from(new Set(normalized));
 };
 
 const normalizeLeadMinutes = (value: unknown): number => {

@@ -17,6 +17,7 @@ type AlarmFormProps = {
   onSubmit: (payload: NewAlarmPayload) => Promise<void>;
   onSuccess?: () => void;
   initialValues?: Partial<NewAlarmPayload>;
+  defaultLeadMinutes: number;
   heading?: string;
   submitLabel?: string;
   submittingLabel?: string;
@@ -26,15 +27,21 @@ const defaultTime = (): string => dayjs().add(10, "minute").format("HH:mm");
 const defaultWeekdays = (): Weekday[] => ["Mon", "Tue", "Wed", "Thu", "Fri"];
 
 const DEFAULT_LEAD_MINUTES = 3;
+const clampLeadMinutesValue = (value: number): number =>
+  Math.max(0, Math.min(720, Math.floor(value)));
 
 const AlarmForm = ({
   onSubmit,
   onSuccess,
   initialValues,
+  defaultLeadMinutes,
   heading,
   submitLabel,
   submittingLabel
 }: AlarmFormProps) => {
+  const sanitizedDefaultLeadMinutes = clampLeadMinutesValue(
+    Number.isFinite(defaultLeadMinutes) ? defaultLeadMinutes : DEFAULT_LEAD_MINUTES
+  );
   const [title, setTitle] = useState(initialValues?.title ?? "");
   const [timeLabel, setTimeLabel] = useState(initialValues?.timeLabel ?? defaultTime());
   const [url, setUrl] = useState(initialValues?.url ?? "");
@@ -44,7 +51,9 @@ const AlarmForm = ({
       ? [...initialValues.repeatDays]
       : defaultWeekdays()
   );
-  const [leadMinutes, setLeadMinutes] = useState(initialValues?.leadMinutes ?? DEFAULT_LEAD_MINUTES);
+  const [leadMinutes, setLeadMinutes] = useState(
+    initialValues?.leadMinutes ?? sanitizedDefaultLeadMinutes
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -59,8 +68,8 @@ const AlarmForm = ({
         ? [...initialValues.repeatDays]
         : defaultWeekdays()
     );
-    setLeadMinutes(initialValues.leadMinutes ?? DEFAULT_LEAD_MINUTES);
-  }, [initialValues]);
+    setLeadMinutes(initialValues.leadMinutes ?? sanitizedDefaultLeadMinutes);
+  }, [initialValues, sanitizedDefaultLeadMinutes]);
 
   const disableSubmit = useMemo(() => {
     if (!timeLabel) return true;
@@ -104,7 +113,7 @@ const AlarmForm = ({
       setUrl("");
       setRepeatEnabled(false);
       setRepeatDays(defaultWeekdays());
-      setLeadMinutes(DEFAULT_LEAD_MINUTES);
+      setLeadMinutes(sanitizedDefaultLeadMinutes);
       onSuccess?.();
     } catch (err) {
       console.error(err);
@@ -131,11 +140,7 @@ const AlarmForm = ({
           value={leadMinutes}
           onChange={(event) => {
             const parsed = Number(event.target.value);
-            if (!Number.isFinite(parsed)) {
-              setLeadMinutes(0);
-              return;
-            }
-            const clamped = Math.max(0, Math.min(720, Math.floor(parsed)));
+            const clamped = clampLeadMinutesValue(Number.isFinite(parsed) ? parsed : 0);
             setLeadMinutes(clamped);
           }}
         />
