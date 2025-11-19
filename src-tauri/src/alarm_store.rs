@@ -5,7 +5,7 @@ use chrono::{
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use uuid::Uuid;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,16 +107,8 @@ pub struct AlarmStore {
 
 impl AlarmStore {
     pub fn new(path: PathBuf) -> Result<Self> {
-        let alarms = if path.exists() {
-            let raw = fs::read_to_string(&path)?;
-            if raw.is_empty() {
-                Vec::new()
-            } else {
-                serde_json::from_str(&raw)?
-            }
-        } else {
-            Vec::new()
-        };
+        let alarms = load_alarms_from_disk(&path)?;
+
         Ok(Self {
             path,
             alarms,
@@ -192,9 +184,13 @@ impl AlarmStore {
             if self.ringing.contains(&alarm.id) {
                 continue;
             }
-            let fire_time = DateTime::parse_from_rfc3339(&alarm.next_fire_time)
-                .with_context(|| format!("next_fire_time parse error: {}", alarm.next_fire_time))?
-                .with_timezone(&Local);
+            let fire_time = match DateTime::parse_from_rfc3339(&alarm.next_fire_time) {
+                Ok(value) => value.with_timezone(&Local),
+                Err(err) => {
+                    eprintln!("next_fire_time parse error ({}): {}", alarm.id, err);
+                    continue;
+                }
+            };
             if fire_time <= now {
                 self.ringing.insert(alarm.id.clone());
                 due.push(alarm.clone());
@@ -236,13 +232,16 @@ impl AlarmStore {
         payloads: Vec<NewAlarmPayload>,
         replace_existing: bool,
     ) -> Result<()> {
-        if replace_existing {
-            self.alarms.clear();
-            self.ringing.clear();
-        }
+        let mut incoming = Vec::with_capacity(payloads.len());
         for payload in payloads {
             let alarm = build_alarm_from_payload(payload, Local::now())?;
-            self.alarms.push(alarm);
+            incoming.push(alarm);
+        }
+        if replace_existing {
+            self.alarms = incoming;
+            self.ringing.clear();
+        } else {
+            self.alarms.extend(incoming);
         }
         self.save()
     }
@@ -254,6 +253,31 @@ impl AlarmStore {
         let data = serde_json::to_string_pretty(&self.alarms)?;
         fs::write(&self.path, data)?;
         Ok(())
+    }
+}
+
+fn load_alarms_from_disk(path: &Path) -> Result<Vec<Alarm>> {
+    if !path.exists() {
+        return Ok(Vec::new());
+    }
+    let raw = fs::read_to_string(path)?;
+    if raw.trim().is_empty() {
+        return Ok(Vec::new());
+    }
+    match serde_json::from_str(&raw) {
+        Ok(alarms) => Ok(alarms),
+        Err(err) => {
+            eprintln!("Failed to parse alarms file ({}): {}", path.display(), err);
+            let suffix = format!("corrupt-{}", Local::now().format("%Y%m%d%H%M%S"));
+            let backup_path = path.with_extension(suffix);
+            if let Err(rename_err) = fs::rename(path, &backup_path) {
+                eprintln!(
+                    "Failed to move corrupted alarms file for inspection: {:?}",
+                    rename_err
+                );
+            }
+            Ok(Vec::new())
+        }
     }
 }
 

@@ -57,7 +57,7 @@ const loadDefaultLeadMinutes = (): number => {
 
 const App = () => {
   const [alarms, setAlarms] = useState<Alarm[]>([]);
-  const [activeAlarm, setActiveAlarm] = useState<Alarm | null>(null);
+  const [alarmQueue, setAlarmQueue] = useState<Alarm[]>([]);
   const [editingAlarm, setEditingAlarm] = useState<Alarm | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,6 +69,7 @@ const App = () => {
   );
   const audioCtxRef = useRef<AudioContext | null>(null);
   const oscillatorsRef = useRef<OscillatorNode[]>([]);
+  const currentAlarm = alarmQueue[0] ?? null;
   const subtitleText = useMemo(() => {
     const index = Math.floor(Math.random() * SUBTITLE_OPTIONS.length);
     return SUBTITLE_OPTIONS[index];
@@ -87,28 +88,16 @@ const App = () => {
     }
   }, []);
 
-  useEffect(() => {
-    refresh();
-    const unlistenPromise = listen<Alarm>("alarm_triggered", (event) => {
-      setActiveAlarm(event.payload);
-      startTone();
-    });
-    return () => {
-      unlistenPromise.then((unlisten) => unlisten());
-      stopTone();
-    };
-  }, [refresh]);
-
-  const cleanupTone = () => {
+  const cleanupTone = useCallback(() => {
     oscillatorsRef.current = [];
     const ctx = audioCtxRef.current;
     audioCtxRef.current = null;
     if (ctx) {
       void ctx.close();
     }
-  };
+  }, []);
 
-  const startTone = () => {
+  const startTone = useCallback(() => {
     if (audioCtxRef.current) return;
     const ctx = new AudioContext();
     const now = ctx.currentTime;
@@ -152,9 +141,9 @@ const App = () => {
 
     audioCtxRef.current = ctx;
     oscillatorsRef.current = activeOscillators;
-  };
+  }, [cleanupTone]);
 
-  const stopTone = () => {
+  const stopTone = useCallback(() => {
     if (!audioCtxRef.current) return;
     oscillatorsRef.current.forEach((osc) => {
       osc.onended = null;
@@ -165,7 +154,27 @@ const App = () => {
       }
     });
     cleanupTone();
-  };
+  }, [cleanupTone]);
+
+  useEffect(() => {
+    refresh();
+    const unlistenPromise = listen<Alarm>("alarm_triggered", (event) => {
+      setAlarmQueue((prev) => {
+        if (prev.some((alarm) => alarm.id === event.payload.id)) {
+          return prev;
+        }
+        if (prev.length === 0) {
+          startTone();
+        }
+        return [...prev, event.payload];
+      });
+    });
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+      setAlarmQueue([]);
+      stopTone();
+    };
+  }, [refresh, startTone, stopTone]);
 
   const handleCreate = async (payload: NewAlarmPayload) => {
     const updated = await invoke<Alarm[]>("create_alarm", { payload });
@@ -233,17 +242,29 @@ const App = () => {
   };
 
   const handleStop = async () => {
-    if (!activeAlarm) return;
+    const alarmToStop = currentAlarm;
+    if (!alarmToStop) return;
     try {
       const updated = await invoke<Alarm[]>("acknowledge_alarm", {
-        id: activeAlarm.id,
+        id: alarmToStop.id,
       });
       setAlarms(updated);
+      let queueEmptied = false;
+      setAlarmQueue((prev) => {
+        if (prev.length === 0) {
+          return prev;
+        }
+        const [, ...rest] = prev;
+        if (rest.length === 0) {
+          queueEmptied = true;
+        }
+        return rest;
+      });
+      if (queueEmptied) {
+        stopTone();
+      }
     } catch (err) {
       console.error(err);
-    } finally {
-      setActiveAlarm(null);
-      stopTone();
     }
   };
 
@@ -294,7 +315,7 @@ const App = () => {
         ＋ アラーム追加
       </button>
       <AlarmDialog
-        alarm={activeAlarm}
+        alarm={currentAlarm}
         onStop={handleStop}
         onOpenUrl={handleOpenUrl}
       />
