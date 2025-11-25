@@ -85,6 +85,7 @@ fn start_alarm_loop(app: AppHandle) {
 
 fn notify_alarms(app: &AppHandle, alarms: Vec<Alarm>) {
     if let Some(window) = app.get_webview_window("main") {
+        let _ = window.unminimize();
         let _ = window.set_always_on_top(true);
         let _ = window.show();
         let _ = window.set_focus();
