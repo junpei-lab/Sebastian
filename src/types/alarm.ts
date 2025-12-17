@@ -14,6 +14,7 @@ export interface Alarm {
 export interface NewAlarmPayload {
   title: string;
   timeLabel: string;
+  dateLabel?: string;
   url?: string;
   repeatEnabled: boolean;
   repeatDays: Weekday[];

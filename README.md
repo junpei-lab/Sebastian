@@ -44,7 +44,7 @@ _Midnight feathers chase quiet echoes._
 | `acknowledge_alarm`  | `id: string`                                             | 鳴動中アラームを停止し、繰り返しなら次回の `next_fire_time` を再計算 |
 | `import_alarms`      | `payloads: Vec<NewAlarmPayload>, replace_existing: bool` | JSON から複数のアラームを取り込み、置換モードにも対応                |
 
-`NewAlarmPayload` は `title`, `timeLabel`, `url?`, `repeatEnabled`, `repeatDays`, `leadMinutes` を持ち、UI と Rust (`serde(rename_all = "camelCase")`) で共有されています。
+`NewAlarmPayload` は `title`, `timeLabel`, `dateLabel?`, `url?`, `repeatEnabled`, `repeatDays`, `leadMinutes` を持ち、UI と Rust (`serde(rename_all = "camelCase")`) で共有されています。`dateLabel` は単発アラーム向けの日付指定（`YYYY-MM-DD`）で、未指定の場合は従来通り「次に来る時刻（今日/明日）」として扱われます。
 
 ## 必要環境
 
@@ -179,6 +179,7 @@ Rust 側の単体テスト（必要に応じて `alarm_store.rs` に追加）と
   },
   {
     "title": "One-off reminder",
+    "dateLabel": "2025-02-01",
     "timeLabel": "15:00",
     "repeatEnabled": false,
     "repeatDays": [],
@@ -205,6 +206,8 @@ Rust 側の単体テスト（必要に応じて `alarm_store.rs` に追加）と
 ```
 
 許可されるキーは `camelCase`/`snake_case` 両対応です（例: `timeLabel` / `time_label`）。不足フィールドは検証時にエラーとなり、`leadMinutes` は省略すると 3 に丸められます。「既存のアラームを全て削除してから取り込む」を有効にすると `replace_existing=true` で `AlarmStore` を初期化します。取り込み後は一覧が直ちに再読み込みされます。`repeatDays` を省略または空配列にした場合は単発アラームとして扱われ、自動で `repeatEnabled=false` になります。文字列・配列で渡した曜日は `Mon`〜`Sun` のうち有効なものだけが採用されます。
+`dateLabel`（`YYYY-MM-DD`）を指定すると単発アラームを指定日で作成できます（`snake_case` は `date_label`）。
+
 ## アラーム動作
 
 1. 追加/更新時に Rust 側で `chrono` を使って次回発火時刻を計算し、`alarms.json` を保存します。
@@ -226,13 +229,14 @@ Rust 側の単体テスト（必要に応じて `alarm_store.rs` に追加）と
 ## 手動テストチェックリスト
 
 1. `npm run tauri:dev` で起動し、単発・繰り返しのアラームを新規作成できること。
-2. URL 付きアラームで「リンクを開く」ボタンが既定ブラウザを開くこと。
-3. 繰り返し ON + 曜日複数選択時に UI/保存共に正しく反映され、曜日未選択時は送信できないこと。
-4. `leadMinutes` を 0 や 720 など境界値にしても保存され、`AlarmList` で相対時刻が更新されること。
-5. アラームを現在時刻から数分後に設定して鳴動を確認し、停止で音と最前面化が解除されること。
-6. JSON インポート（置換モード ON/OFF 両方）で期待通りに一覧が更新されること。
-7. ウィンドウを閉じてもトレイに残り、ダブルクリックで復帰 / メニュー「終了」で完全終了できること。
-8. 削除ボタンでアラームが即座に消えること。
+2. 単発アラームで日付を指定した場合、その日時で鳴動すること（過去日時はエラーになること）。
+3. URL 付きアラームで「リンクを開く」ボタンが既定ブラウザを開くこと。
+4. 繰り返し ON + 曜日複数選択時に UI/保存共に正しく反映され、曜日未選択時は送信できないこと。
+5. `leadMinutes` を 0 や 720 など境界値にしても保存され、`AlarmList` で相対時刻が更新されること。
+6. アラームを現在時刻から数分後に設定して鳴動を確認し、停止で音と最前面化が解除されること。
+7. JSON インポート（置換モード ON/OFF 両方）で期待通りに一覧が更新されること。
+8. ウィンドウを閉じてもトレイに残り、ダブルクリックで復帰 / メニュー「終了」で完全終了できること。
+9. 削除ボタンでアラームが即座に消えること。
 
 ## トラブルシューティング
 

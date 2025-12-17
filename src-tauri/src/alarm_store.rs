@@ -1,6 +1,7 @@
 use anyhow::{anyhow, Context, Result};
 use chrono::{
-    DateTime, Datelike, Duration, Local, NaiveTime, TimeZone, Timelike, Weekday as ChronoWeekday,
+    DateTime, Datelike, Duration, Local, NaiveDate, NaiveTime, TimeZone, Timelike,
+    Weekday as ChronoWeekday,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -28,6 +29,7 @@ pub struct Alarm {
 pub struct NewAlarmPayload {
     pub title: String,
     pub time_label: String,
+    pub date_label: Option<String>,
     pub url: Option<String>,
     pub repeat_enabled: bool,
     #[serde(default)]
@@ -76,6 +78,7 @@ fn build_alarm_from_payload(payload: NewAlarmPayload, now: DateTime<Local>) -> R
     let NewAlarmPayload {
         title,
         time_label,
+        date_label,
         url,
         repeat_enabled,
         repeat_days,
@@ -85,7 +88,14 @@ fn build_alarm_from_payload(payload: NewAlarmPayload, now: DateTime<Local>) -> R
     let title = title.trim().to_string();
     let time_label = time_label.trim().to_string();
     let lead_minutes = clamp_lead_minutes(lead_minutes);
-    let next = compute_next_fire(&time_label, repeat_enabled, &repeat_days, lead_minutes, now)?;
+    let next = compute_next_fire(
+        &time_label,
+        date_label.as_deref(),
+        repeat_enabled,
+        &repeat_days,
+        lead_minutes,
+        now,
+    )?;
     Ok(Alarm {
         id: Uuid::new_v4().to_string(),
         title,
@@ -149,6 +159,7 @@ impl AlarmStore {
         let NewAlarmPayload {
             title,
             time_label,
+            date_label,
             url,
             repeat_enabled,
             repeat_days,
@@ -162,7 +173,14 @@ impl AlarmStore {
         let title = title.trim().to_string();
         let time_label = time_label.trim().to_string();
         let lead_minutes = clamp_lead_minutes(lead_minutes);
-        let next = compute_next_fire(&time_label, repeat_enabled, &repeat_days, lead_minutes, now)?;
+        let next = compute_next_fire(
+            &time_label,
+            date_label.as_deref(),
+            repeat_enabled,
+            &repeat_days,
+            lead_minutes,
+            now,
+        )?;
         if let Some(alarm) = self.alarms.iter_mut().find(|a| a.id == id) {
             alarm.title = title;
             alarm.time_label = time_label;
@@ -208,6 +226,7 @@ impl AlarmStore {
                 let lead_minutes = self.alarms[index].lead_minutes;
                 let next = compute_next_fire(
                     &self.alarms[index].time_label,
+                    None,
                     true,
                     &self.alarms[index].repeat_days,
                     lead_minutes,
@@ -283,6 +302,7 @@ fn load_alarms_from_disk(path: &Path) -> Result<Vec<Alarm>> {
 
 fn compute_next_fire(
     time_label: &str,
+    date_label: Option<&str>,
     repeat_enabled: bool,
     repeat_days: &[Weekday],
     lead_minutes: i64,
@@ -317,6 +337,33 @@ fn compute_next_fire(
         return Err(anyhow!("次回の発火時刻を計算できませんでした。"));
     }
 
+    let date_label = date_label.and_then(|label| {
+        let trimmed = label.trim();
+        if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed)
+        }
+    });
+    if let Some(date_label) = date_label {
+        let date = parse_date_label(date_label)?;
+        let candidate = Local
+            .with_ymd_and_hms(
+                date.year(),
+                date.month(),
+                date.day(),
+                time.hour(),
+                time.minute(),
+                0,
+            )
+            .single()
+            .ok_or_else(|| anyhow!("無効な日付です。"))?;
+        if candidate <= adjusted_base {
+            return Err(anyhow!("指定した日時は過去です。"));
+        }
+        return Ok(candidate - lead_duration);
+    }
+
     let mut candidate = Local
         .with_ymd_and_hms(
             adjusted_base.year(),
@@ -337,4 +384,54 @@ fn compute_next_fire(
 fn parse_time_label(label: &str) -> Result<NaiveTime> {
     NaiveTime::parse_from_str(label, "%H:%M")
         .with_context(|| format!("時刻の解析に失敗しました: {}", label))
+}
+
+fn parse_date_label(label: &str) -> Result<NaiveDate> {
+    NaiveDate::parse_from_str(label, "%Y-%m-%d")
+        .with_context(|| format!("日付の解析に失敗しました: {}", label))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn compute_next_fire_with_date_label_respects_lead_minutes() -> Result<()> {
+        let base = Local
+            .with_ymd_and_hms(2025, 1, 1, 10, 0, 0)
+            .single()
+            .expect("test base datetime");
+        let next = compute_next_fire("11:00", Some("2025-01-01"), false, &[], 15, base)?;
+        let expected_event = Local
+            .with_ymd_and_hms(2025, 1, 1, 11, 0, 0)
+            .single()
+            .expect("test expected datetime");
+        assert_eq!(next, expected_event - Duration::minutes(15));
+        Ok(())
+    }
+
+    #[test]
+    fn compute_next_fire_with_date_label_rejects_past_after_lead() {
+        let base = Local
+            .with_ymd_and_hms(2025, 1, 1, 10, 0, 0)
+            .single()
+            .expect("test base datetime");
+        let err = compute_next_fire("10:10", Some("2025-01-01"), false, &[], 15, base)
+            .expect_err("should reject past datetime");
+        assert!(
+            err.to_string().contains("過去"),
+            "unexpected error: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn parse_date_label_rejects_invalid_format() {
+        let err = parse_date_label("2025/01/01").expect_err("should fail");
+        assert!(
+            err.to_string().contains("日付"),
+            "unexpected error: {}",
+            err
+        );
+    }
 }

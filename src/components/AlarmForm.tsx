@@ -30,6 +30,27 @@ const DEFAULT_LEAD_MINUTES = 3;
 const clampLeadMinutesValue = (value: number): number =>
   Math.max(0, Math.min(720, Math.floor(value)));
 
+const parseTimeLabel = (value: string): { hours: number; minutes: number } => {
+  const [hours = "0", minutes = "0"] = value.split(":");
+  const parsedHours = Number.parseInt(hours, 10);
+  const parsedMinutes = Number.parseInt(minutes, 10);
+  return {
+    hours: Number.isFinite(parsedHours) ? Math.min(Math.max(parsedHours, 0), 23) : 0,
+    minutes: Number.isFinite(parsedMinutes) ? Math.min(Math.max(parsedMinutes, 0), 59) : 0
+  };
+};
+
+const computeAutoDateLabel = (timeLabel: string, leadMinutes: number): string => {
+  const safeLeadMinutes = clampLeadMinutesValue(leadMinutes);
+  const adjustedBase = dayjs().add(safeLeadMinutes, "minute");
+  const { hours, minutes } = parseTimeLabel(timeLabel);
+  let candidate = adjustedBase.hour(hours).minute(minutes).second(0).millisecond(0);
+  if (candidate.diff(adjustedBase) <= 0) {
+    candidate = candidate.add(1, "day");
+  }
+  return candidate.format("YYYY-MM-DD");
+};
+
 const AlarmForm = ({
   onSubmit,
   onSuccess,
@@ -42,8 +63,13 @@ const AlarmForm = ({
   const sanitizedDefaultLeadMinutes = clampLeadMinutesValue(
     Number.isFinite(defaultLeadMinutes) ? defaultLeadMinutes : DEFAULT_LEAD_MINUTES
   );
+  const initialLeadMinutes = initialValues?.leadMinutes ?? sanitizedDefaultLeadMinutes;
+  const initialTimeLabel = initialValues?.timeLabel ?? defaultTime();
+  const initialDateLabel =
+    initialValues?.dateLabel ?? computeAutoDateLabel(initialTimeLabel, initialLeadMinutes);
   const [title, setTitle] = useState(initialValues?.title ?? "");
-  const [timeLabel, setTimeLabel] = useState(initialValues?.timeLabel ?? defaultTime());
+  const [timeLabel, setTimeLabel] = useState(initialTimeLabel);
+  const [dateLabel, setDateLabel] = useState(initialDateLabel);
   const [url, setUrl] = useState(initialValues?.url ?? "");
   const [repeatEnabled, setRepeatEnabled] = useState(initialValues?.repeatEnabled ?? false);
   const [repeatDays, setRepeatDays] = useState<Weekday[]>(
@@ -51,16 +77,18 @@ const AlarmForm = ({
       ? [...initialValues.repeatDays]
       : defaultWeekdays()
   );
-  const [leadMinutes, setLeadMinutes] = useState(
-    initialValues?.leadMinutes ?? sanitizedDefaultLeadMinutes
-  );
+  const [leadMinutes, setLeadMinutes] = useState(initialLeadMinutes);
+  const [dateTouched, setDateTouched] = useState(() => Boolean(initialValues));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!initialValues) return;
     setTitle(initialValues.title ?? "");
-    setTimeLabel(initialValues.timeLabel ?? defaultTime());
+    const nextLeadMinutes = initialValues.leadMinutes ?? sanitizedDefaultLeadMinutes;
+    const nextTimeLabel = initialValues.timeLabel ?? defaultTime();
+    setTimeLabel(nextTimeLabel);
+    setDateLabel(initialValues.dateLabel ?? computeAutoDateLabel(nextTimeLabel, nextLeadMinutes));
     setUrl(initialValues.url ?? "");
     setRepeatEnabled(initialValues.repeatEnabled ?? false);
     setRepeatDays(
@@ -68,8 +96,16 @@ const AlarmForm = ({
         ? [...initialValues.repeatDays]
         : defaultWeekdays()
     );
-    setLeadMinutes(initialValues.leadMinutes ?? sanitizedDefaultLeadMinutes);
+    setLeadMinutes(nextLeadMinutes);
+    setDateTouched(true);
   }, [initialValues, sanitizedDefaultLeadMinutes]);
+
+  useEffect(() => {
+    if (repeatEnabled) return;
+    if (dateTouched) return;
+    const next = computeAutoDateLabel(timeLabel, leadMinutes);
+    setDateLabel((prev) => (prev === next ? prev : next));
+  }, [dateTouched, leadMinutes, repeatEnabled, timeLabel]);
 
   const disableSubmit = useMemo(() => {
     if (!timeLabel) return true;
@@ -103,13 +139,17 @@ const AlarmForm = ({
       await onSubmit({
         title: title.trim(),
         timeLabel,
+        dateLabel: repeatEnabled ? undefined : dateLabel.trim() || undefined,
         url: trimmedUrl || undefined,
         repeatEnabled,
         repeatDays,
         leadMinutes
       });
       setTitle("");
-      setTimeLabel(defaultTime());
+      const nextTimeLabel = defaultTime();
+      setTimeLabel(nextTimeLabel);
+      setDateLabel(computeAutoDateLabel(nextTimeLabel, sanitizedDefaultLeadMinutes));
+      setDateTouched(false);
       setUrl("");
       setRepeatEnabled(false);
       setRepeatDays(defaultWeekdays());
@@ -117,7 +157,9 @@ const AlarmForm = ({
       onSuccess?.();
     } catch (err) {
       console.error(err);
-      setError("アラームの追加に失敗しました。");
+      const message =
+        err instanceof Error ? err.message : typeof err === "string" ? err : null;
+      setError(message ?? "アラームの保存に失敗しました。");
     } finally {
       setSubmitting(false);
     }
@@ -130,6 +172,19 @@ const AlarmForm = ({
         <span>時刻</span>
         <TimePicker value={timeLabel} onChange={setTimeLabel} />
       </div>
+      {!repeatEnabled && (
+        <label className="form-row">
+          <span>日付</span>
+          <input
+            type="date"
+            value={dateLabel}
+            onChange={(event) => {
+              setDateTouched(true);
+              setDateLabel(event.target.value);
+            }}
+          />
+        </label>
+      )}
       <label className="form-row">
         <span>何分前に鳴らすか</span>
         <input

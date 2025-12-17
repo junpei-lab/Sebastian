@@ -44,7 +44,7 @@ const highlightedDays = (alarm: Alarm): Set<Weekday> => {
   if (alarm.repeatEnabled && alarm.repeatDays.length > 0) {
     return new Set(alarm.repeatDays);
   }
-  const fallbackIndex = dayjs(alarm.nextFireTime).day();
+  const fallbackIndex = dayjs(alarm.nextFireTime).add(alarm.leadMinutes, "minute").day();
   const fallbackDay = weekdayOrder[fallbackIndex] ?? "Mon";
   return new Set<Weekday>([fallbackDay]);
 };
@@ -81,6 +81,8 @@ const AlarmList = ({
     <div className="alarm-list">
       {sorted.map((alarm) => {
         const activeDays = highlightedDays(alarm);
+        const ringTime = dayjs(alarm.nextFireTime);
+        const eventTime = ringTime.add(alarm.leadMinutes, "minute");
         return (
           <article
             key={alarm.id}
@@ -98,10 +100,10 @@ const AlarmList = ({
             <div className="alarm-card-inner">
               <div className="alarm-time-row">
                 <div>
-                  <p className="alarm-time">{alarm.timeLabel}</p>
+                  <p className="alarm-time">{eventTime.format("YYYY/MM/DD HH:mm")}</p>
                   <p
                     className="alarm-relative"
-                    title={dayjs(alarm.nextFireTime).format("YYYY/MM/DD HH:mm")}
+                    title={`通知: ${ringTime.format("YYYY/MM/DD HH:mm")} / 予定: ${eventTime.format("YYYY/MM/DD HH:mm")}`}
                   >
                     <span className="bell-icon" aria-hidden="true">
                       🔔

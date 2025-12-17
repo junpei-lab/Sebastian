@@ -80,6 +80,14 @@ const ImportAlarmsModal = ({ open, onClose, onSubmit }: ImportAlarmsModalProps) 
     "repeatDays": ["Mon", "Wed", "Fri"],
     "url": "https://example.com",
     "leadMinutes": 5
+  },
+  {
+    "title": "病院の予約",
+    "dateLabel": "2025-02-01",
+    "timeLabel": "10:00",
+    "repeatEnabled": false,
+    "repeatDays": [],
+    "leadMinutes": 10
   }
 ]`}
             value={jsonText}
@@ -148,6 +156,7 @@ const normalizePayload = (value: unknown, index: number): NewAlarmPayload => {
   const record = value as Record<string, unknown>;
   const title = pickString(record, ["title"], index, "title");
   const timeLabel = pickString(record, ["timeLabel", "time_label"], index, "timeLabel");
+  const dateLabel = pickOptionalString(record, ["dateLabel", "date_label"]);
   const url = pickOptionalString(record, ["url"]);
   const repeatDaysValue = pickOptional(record, ["repeatDays", "repeat_days"]);
   const repeatDays = normalizeRepeatDays(repeatDaysValue, index);
@@ -161,6 +170,7 @@ const normalizePayload = (value: unknown, index: number): NewAlarmPayload => {
   return {
     title: title.trim(),
     timeLabel: timeLabel.trim(),
+    dateLabel,
     url,
     repeatEnabled,
     repeatDays,

@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState, ChangeEvent } from "react";
+import dayjs from "dayjs";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { openUrl } from "@tauri-apps/plugin-opener";
@@ -211,13 +212,16 @@ const App = () => {
 
   const editingInitialValues = useMemo(() => {
     if (!editingAlarm) return undefined;
+    const leadMinutes = editingAlarm.leadMinutes ?? defaultLeadMinutes;
+    const eventTime = dayjs(editingAlarm.nextFireTime).add(leadMinutes, "minute");
     return {
       title: editingAlarm.title,
       timeLabel: editingAlarm.timeLabel,
+      dateLabel: eventTime.format("YYYY-MM-DD"),
       url: editingAlarm.url,
       repeatEnabled: editingAlarm.repeatEnabled,
       repeatDays: editingAlarm.repeatDays,
-      leadMinutes: editingAlarm.leadMinutes ?? defaultLeadMinutes,
+      leadMinutes,
     };
   }, [editingAlarm, defaultLeadMinutes]);
 
